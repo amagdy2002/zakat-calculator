@@ -31,13 +31,21 @@ export function Sources({ sources, className }: SourcesProps) {
       launchgood: { bg: 'bg-teal-600', text: 'text-white' },
       fiqh_council: { bg: 'bg-rose-600', text: 'text-white' },
       barakah_capital: { bg: 'bg-amber-600', text: 'text-white' },
-      joe_bradford: { bg: 'bg-cyan-600', text: 'text-white' }
+      joe_bradford: { bg: 'bg-cyan-600', text: 'text-white' },
+      irs_retirement: { bg: 'bg-blue-700', text: 'text-white' },
+      irs_pub_590b: { bg: 'bg-blue-700', text: 'text-white' },
+      irs_457b: { bg: 'bg-blue-700', text: 'text-white' },
+      irs_simple_ira: { bg: 'bg-blue-700', text: 'text-white' },
+      vanguard_retirement: { bg: 'bg-red-600', text: 'text-white' },
+      bankrate_retirement: { bg: 'bg-green-700', text: 'text-white' },
+      schwab_retirement: { bg: 'bg-sky-600', text: 'text-white' },
+      fidelity_retirement: { bg: 'bg-emerald-600', text: 'text-white' }
     }
     return colorMap[sourceId] || { bg: 'bg-gray-600', text: 'text-white' }
   }
 
   return (
-    <div 
+    <div
       className={cn(
         "inline-flex items-center gap-1 px-3 py-1.5 bg-white rounded-full border border-gray-100 shadow-sm",
         className

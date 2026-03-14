@@ -1,4 +1,4 @@
-import { StockValues, StockPrices, StockHolding } from '@/lib/assets/stocks'
+import { StockValues, StockPrices, StockHolding, StockAccount } from '@/lib/assets/stocks'
 import { initialStockPrices, DEFAULT_HAWL_STATUS } from '../constants'
 import { getAssetType } from '@/lib/assets/registry'
 import { getStockPrice, getBatchStockPrices } from '@/lib/api/stocks'
@@ -201,6 +201,11 @@ export interface StocksSlice {
   removeActiveStock: (symbol: string) => void
   updateStockPrices: (targetCurrency?: string, fromCurrency?: string) => Promise<void>
 
+  // Per-account Actions
+  addStockAccount: () => void
+  removeStockAccount: (id: string) => void
+  updateStockAccount: (id: string, field: keyof Omit<StockAccount, 'id'>, value: string | number) => void
+
   // Legacy Actions
   setStockValue: (key: keyof StockValues, value: number | boolean) => void
   resetStockValues: () => void
@@ -260,6 +265,9 @@ export interface StocksSlice {
 const initialStockValues: StockValues = {
   // Active Trading 
   activeStocks: [],
+
+  // Per-account
+  stockAccounts: [],
 
   // Required fields
   market_value: 0,
@@ -648,6 +656,7 @@ export const createStocksSlice: StateCreator<ZakatState, [], [], any> = (set, ge
     set({
       stockValues: {
         ...initialStockValues,
+        stockAccounts: [],
         passiveInvestments: {
           version: '2.0',
           method: 'quick',
@@ -680,6 +689,43 @@ export const createStocksSlice: StateCreator<ZakatState, [], [], any> = (set, ge
 
   setStockHawl: (value: boolean) => set({ stockHawlMet: value }),
 
+  // Per-account Actions
+  addStockAccount: () => {
+    const newAccount: StockAccount = {
+      id: Date.now().toString(),
+      name: '',
+      active: 0,
+      passive: 0,
+      dividends: 0,
+    }
+    set((state) => ({
+      stockValues: {
+        ...state.stockValues,
+        stockAccounts: [...(state.stockValues.stockAccounts || []), newAccount]
+      }
+    }))
+  },
+
+  removeStockAccount: (id: string) => {
+    set((state) => ({
+      stockValues: {
+        ...state.stockValues,
+        stockAccounts: (state.stockValues.stockAccounts || []).filter(a => a.id !== id)
+      }
+    }))
+  },
+
+  updateStockAccount: (id: string, field: keyof Omit<StockAccount, 'id'>, value: string | number) => {
+    set((state) => ({
+      stockValues: {
+        ...state.stockValues,
+        stockAccounts: (state.stockValues.stockAccounts || []).map(a =>
+          a.id === id ? { ...a, [field]: value } : a
+        )
+      }
+    }))
+  },
+
   // Getters
   getTotalStocks: () => {
     const state = get()
@@ -698,14 +744,28 @@ export const createStocksSlice: StateCreator<ZakatState, [], [], any> = (set, ge
     // Get dividend total
     const dividendTotal = state.stockValues?.total_dividend_earnings || 0
 
+    // Get per-account totals (active + passive + dividends per account)
+    const accountsTotal = Array.isArray(state.stockValues?.stockAccounts)
+      ? state.stockValues.stockAccounts.reduce(
+        (sum: number, acc: StockAccount) =>
+          sum +
+          (Number.isFinite(acc.active) ? acc.active : 0) +
+          (Number.isFinite(acc.passive) ? acc.passive : 0) +
+          (Number.isFinite(acc.dividends) ? acc.dividends : 0),
+        0
+      )
+      : 0
+
     // Return total, ensuring it's a valid number
-    const total = activeTotal + passiveTotal + dividendTotal
+    const total = activeTotal + passiveTotal + dividendTotal + accountsTotal
     return Number.isFinite(total) ? roundCurrency(total) : 0
   },
 
   getTotalZakatableStocks: () => {
     const state = get()
     if (!state.stockHawlMet) return 0
+
+    const PASSIVE_FUND_RATE = 0.3
 
     // Get active stocks total (fully zakatable)
     const activeTotal = Array.isArray(state.stockValues?.activeStocks)
@@ -721,8 +781,20 @@ export const createStocksSlice: StateCreator<ZakatState, [], [], any> = (set, ge
     // Get dividend total (fully zakatable)
     const dividendTotal = state.stockValues?.total_dividend_earnings || 0
 
+    // Get per-account zakatable amounts: active=100%, passive=30%, dividends=100%
+    const accountsZakatable = Array.isArray(state.stockValues?.stockAccounts)
+      ? state.stockValues.stockAccounts.reduce(
+        (sum: number, acc: StockAccount) =>
+          sum +
+          (Number.isFinite(acc.active) ? acc.active : 0) +
+          (Number.isFinite(acc.passive) ? acc.passive * PASSIVE_FUND_RATE : 0) +
+          (Number.isFinite(acc.dividends) ? acc.dividends : 0),
+        0
+      )
+      : 0
+
     // Return total zakatable amount
-    const total = activeTotal + passiveZakatable + dividendTotal
+    const total = activeTotal + passiveZakatable + dividendTotal + accountsZakatable
     return Number.isFinite(total) ? roundCurrency(total) : 0
   },
 

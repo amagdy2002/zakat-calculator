@@ -1,5 +1,6 @@
 import { StateCreator } from 'zustand'
 import { RetirementValues, ZakatState } from '../types'
+import { RetirementAccount, RetirementAccountType, RETIREMENT_ACCOUNT_META } from './retirement.types'
 import { getAssetType } from '@/lib/assets/registry'
 import { roundCurrency } from '@/lib/utils/currency'
 import { AssetBreakdown } from '@/lib/assets/types'
@@ -16,6 +17,10 @@ export interface RetirementSlice {
   getRetirementTotal: () => number
   getRetirementZakatable: () => number
   getRetirementBreakdown: () => AssetBreakdown
+  // Per-account actions
+  addRetirementAccount: (accountType?: RetirementAccountType) => void
+  removeRetirementAccount: (id: string) => void
+  updateRetirementAccount: (id: string, updates: Partial<Omit<RetirementAccount, 'id'>>) => void
 }
 
 const initialRetirementValues: RetirementValues = {
@@ -24,7 +29,8 @@ const initialRetirementValues: RetirementValues = {
   roth_401k: 0,
   roth_ira: 0,
   pension: 0,
-  other_retirement: 0
+  other_retirement: 0,
+  retirementAccounts: [],
 }
 
 export const createRetirementSlice: StateCreator<
@@ -35,7 +41,7 @@ export const createRetirementSlice: StateCreator<
 > = (set, get) => ({
   retirement: initialRetirementValues,
   retirementHawlMet: DEFAULT_HAWL_STATUS.retirement,
-  
+
   setRetirementValue: (key: keyof RetirementValues, value: number) => {
     // First validate the new value in context of current values
     const currentValues = get().retirement
@@ -43,7 +49,7 @@ export const createRetirementSlice: StateCreator<
       ...currentValues,
       [key]: value
     }
-    
+
     const validationResult = AssetValidation.validateInput('retirement', newValues)
     if (!validationResult.isValid) {
       console.error('Retirement validation failed:', validationResult.errors)
@@ -98,7 +104,7 @@ export const createRetirementSlice: StateCreator<
       ...currentValues,
       ...values
     }
-    
+
     const validationResult = AssetValidation.validateInput('retirement', newValues)
     if (!validationResult.isValid) {
       console.error('Retirement validation failed:', validationResult.errors)
@@ -117,14 +123,14 @@ export const createRetirementSlice: StateCreator<
     }))
   },
 
-  setRetirementHawlMet: (hawlMet: boolean) => 
+  setRetirementHawlMet: (hawlMet: boolean) =>
     set(() => ({
       retirementHawlMet: hawlMet
     })),
 
-  resetRetirement: () => 
+  resetRetirement: () =>
     set(() => ({
-      retirement: initialRetirementValues,
+      retirement: { ...initialRetirementValues, retirementAccounts: [] },
       retirementHawlMet: DEFAULT_HAWL_STATUS.retirement
     })),
 
@@ -164,5 +170,50 @@ export const createRetirementSlice: StateCreator<
       undefined,
       state.retirementHawlMet
     )
-  }
+  },
+
+  // Per-account CRUD
+  addRetirementAccount: (accountType: RetirementAccountType = 'traditional_401k') => {
+    const meta = RETIREMENT_ACCOUNT_META[accountType]
+    const newAccount: RetirementAccount = {
+      id: Date.now().toString(),
+      name: '',
+      accountType,
+      balance: 0,
+      taxRate: meta.defaultTaxRate,
+      penaltyRate: meta.defaultPenaltyRate,
+      isAccessible: !meta.isLocked,
+    }
+    set((state) => ({
+      retirement: {
+        ...state.retirement,
+        retirementAccounts: [
+          ...(state.retirement.retirementAccounts || []),
+          newAccount,
+        ],
+      },
+    }))
+  },
+
+  removeRetirementAccount: (id: string) => {
+    set((state) => ({
+      retirement: {
+        ...state.retirement,
+        retirementAccounts: (state.retirement.retirementAccounts || []).filter(
+          (a) => a.id !== id
+        ),
+      },
+    }))
+  },
+
+  updateRetirementAccount: (id: string, updates: Partial<Omit<RetirementAccount, 'id'>>) => {
+    set((state) => ({
+      retirement: {
+        ...state.retirement,
+        retirementAccounts: (state.retirement.retirementAccounts || []).map((a) =>
+          a.id === id ? { ...a, ...updates } : a
+        ),
+      },
+    }))
+  },
 }) 

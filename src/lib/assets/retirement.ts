@@ -10,6 +10,14 @@
 import { AssetType, AssetBreakdown, AssetBreakdownItem, ZAKAT_RATE, safeCalculate } from './types'
 import { formatCurrency } from '@/lib/utils/currency'
 import { RetirementValues } from '@/store/types'
+import { RETIREMENT_ACCOUNT_META } from '@/store/modules/retirement.types'
+
+/** Calculate net withdrawable amount for a single retirement account. */
+function netWithdrawable(balance: number, taxRate: number, penaltyRate: number, zakatOnNet: boolean): number {
+  if (!zakatOnNet) return balance
+  const net = balance * (1 - taxRate / 100 - penaltyRate / 100)
+  return Math.max(0, net)
+}
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 interface RetirementPrices {
@@ -31,7 +39,11 @@ export const retirement: AssetType = {
     const pension = safeCalculate(values.pension)
     const otherRetirement = safeCalculate(values.other_retirement)
 
-    return traditional401k + traditionalIRA + roth401k + rothIRA + pension + otherRetirement
+    const accountsTotal = Array.isArray(values.retirementAccounts)
+      ? values.retirementAccounts.reduce((sum, acc) => sum + safeCalculate(acc.balance), 0)
+      : 0
+
+    return traditional401k + traditionalIRA + roth401k + rothIRA + pension + otherRetirement + accountsTotal
   },
 
   calculateZakatable: (values: RetirementValues, _prices: undefined, hawlMet: boolean): number => {
@@ -53,7 +65,18 @@ export const retirement: AssetType = {
     // Other retirement is already net amount
     const otherRetirement = safeCalculate(values.other_retirement)
 
-    return hawlMet ? (netAmount + otherRetirement) : 0
+    // Per-account zakatable: locked accounts are deferred
+    const accountsZakatable = Array.isArray(values.retirementAccounts)
+      ? values.retirementAccounts.reduce((sum, acc) => {
+        const meta = RETIREMENT_ACCOUNT_META[acc.accountType]
+        if (meta.isLocked && !acc.isAccessible) return sum
+        const bal = safeCalculate(acc.balance)
+        const net = netWithdrawable(bal, acc.taxRate, acc.penaltyRate, meta.zakatOnNet)
+        return sum + net
+      }, 0)
+      : 0
+
+    return hawlMet ? (netAmount + otherRetirement + accountsZakatable) : 0
   },
 
   getBreakdown: (values: RetirementValues, _prices: undefined, hawlMet: boolean): AssetBreakdown => {
@@ -100,8 +123,21 @@ export const retirement: AssetType = {
     const otherZakatable = hawlMet ? otherRetirement : 0
     const otherZakatDue = otherZakatable * ZAKAT_RATE
 
+    // Per-account breakdown
+    const accountsTotal = Array.isArray(values.retirementAccounts)
+      ? values.retirementAccounts.reduce((sum, acc) => sum + safeCalculate(acc.balance), 0)
+      : 0
+    const accountsZakatable = Array.isArray(values.retirementAccounts)
+      ? values.retirementAccounts.reduce((sum, acc) => {
+        const meta = RETIREMENT_ACCOUNT_META[acc.accountType]
+        if (meta.isLocked && !acc.isAccessible) return sum
+        const bal = safeCalculate(acc.balance)
+        return sum + netWithdrawable(bal, acc.taxRate, acc.penaltyRate, meta.zakatOnNet)
+      }, 0)
+      : 0
+
     // Calculate totals
-    const total = traditionalTotal + rothTotal + pension + otherRetirement
+    const total = traditionalTotal + rothTotal + pension + otherRetirement + accountsTotal
 
     // Calculate net amount for accessible funds
     const taxRate = 0.20 // 20% tax
@@ -111,7 +147,7 @@ export const retirement: AssetType = {
     const netAmount = traditionalTotal - taxAmount - penaltyAmount
 
     // Total zakatable is the net amount of accessible funds plus any withdrawn amounts
-    const zakatable = hawlMet ? (netAmount + otherZakatable) : 0
+    const zakatable = hawlMet ? (netAmount + otherZakatable + accountsZakatable) : 0
     const zakatDue = zakatable * ZAKAT_RATE
 
     // Create breakdown with detailed information

@@ -89,6 +89,9 @@ export interface RealEstateValues extends ModuleRealEstateValues {
 }
 
 // Retirement Types
+import { RetirementAccount } from './modules/retirement.types'
+export type { RetirementAccount, RetirementAccountType } from './modules/retirement.types'
+
 export interface RetirementValues extends Record<string, unknown> {
   traditional_401k: number
   traditional_ira: number
@@ -98,6 +101,7 @@ export interface RetirementValues extends Record<string, unknown> {
   other_retirement: number
   tax_rate?: number
   penalty_rate?: number
+  retirementAccounts?: RetirementAccount[]
 }
 
 export interface ForeignCurrencyEntry {

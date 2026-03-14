@@ -22,6 +22,14 @@ export interface StockHolding {
   lastUpdated?: string
 }
 
+export interface StockAccount {
+  id: string
+  name: string
+  active: number    // active trading value — 100% zakatable
+  passive: number   // passive/long-term value — 30% zakatable
+  dividends: number // dividend earnings — 100% zakatable
+}
+
 export interface StockValues {
   // Active Trading
   activeStocks: StockHolding[]
@@ -50,6 +58,9 @@ export interface StockValues {
       totalLabel: string
     }
   }
+
+  // Per-account input
+  stockAccounts?: StockAccount[]
 
   // Legacy fields (maintained for backward compatibility)
   total_dividend_earnings?: number
@@ -90,8 +101,14 @@ export const stocks: AssetType = {
     // Investment Funds - Use safe calculation
     const fundValue = safeCalculate(values.fund_value)
 
+    // Per-account totals
+    const accountsTotal = Array.isArray(values.stockAccounts)
+      ? values.stockAccounts.reduce((sum, acc) =>
+        sum + safeCalculate(acc.active) + safeCalculate(acc.passive) + safeCalculate(acc.dividends), 0)
+      : 0
+
     // Return total, ensuring it's a valid number
-    const total = activeValue + passiveValue + dividendValue + fundValue
+    const total = activeValue + passiveValue + dividendValue + fundValue + accountsTotal
     return Number.isFinite(total) ? total : 0
   },
 
@@ -120,8 +137,17 @@ export const stocks: AssetType = {
       ? (values.is_passive_fund ? fundValue * PASSIVE_FUND_RATE : fundValue)
       : 0
 
+    // Per-account zakatable: active=100%, passive=30%, dividends=100%
+    const accountsZakatable = hawlMet && Array.isArray(values.stockAccounts)
+      ? values.stockAccounts.reduce((sum, acc) =>
+        sum +
+        safeCalculate(acc.active) +
+        safeCalculate(acc.passive) * PASSIVE_FUND_RATE +
+        safeCalculate(acc.dividends), 0)
+      : 0
+
     // Return total zakatable amount, ensuring it's a valid number
-    const total = activeZakatable + passiveZakatable + dividendZakatable + fundZakatable
+    const total = activeZakatable + passiveZakatable + dividendZakatable + fundZakatable + accountsZakatable
     return Number.isFinite(total) ? total : 0
   },
 
@@ -159,9 +185,22 @@ export const stocks: AssetType = {
       : 0
     const fundZakatDue = fundZakatable * ZAKAT_RATE
 
+    // Per-account breakdown
+    const accountsActive = Array.isArray(values.stockAccounts)
+      ? values.stockAccounts.reduce((sum, acc) => sum + safeCalculate(acc.active), 0) : 0
+    const accountsPassive = Array.isArray(values.stockAccounts)
+      ? values.stockAccounts.reduce((sum, acc) => sum + safeCalculate(acc.passive), 0) : 0
+    const accountsDividends = Array.isArray(values.stockAccounts)
+      ? values.stockAccounts.reduce((sum, acc) => sum + safeCalculate(acc.dividends), 0) : 0
+    const accountsTotal = accountsActive + accountsPassive + accountsDividends
+    const accountsZakatable = hawlMet
+      ? accountsActive + accountsPassive * PASSIVE_FUND_RATE + accountsDividends
+      : 0
+    const accountsZakatDue = accountsZakatable * ZAKAT_RATE
+
     // Calculate totals
-    const total = activeValue + passiveValue + dividendValue + fundValue
-    const zakatable = activeZakatable + passiveZakatable + dividendZakatable + fundZakatable
+    const total = activeValue + passiveValue + dividendValue + fundValue + accountsTotal
+    const zakatable = activeZakatable + passiveZakatable + dividendZakatable + fundZakatable + accountsZakatable
     const zakatDue = zakatable * ZAKAT_RATE
 
     // Create breakdown with detailed information
@@ -201,6 +240,18 @@ export const stocks: AssetType = {
         tooltip: values.is_passive_fund
           ? '30% of fund value is zakatable'
           : 'Full fund value is zakatable'
+      }
+    }
+
+    // Add per-account breakdown if any accounts exist
+    if (accountsTotal > 0 || (Array.isArray(values.stockAccounts) && values.stockAccounts.length > 0)) {
+      items.stock_accounts = {
+        value: accountsTotal,
+        isZakatable: hawlMet,
+        zakatable: accountsZakatable,
+        zakatDue: accountsZakatDue,
+        label: 'Investment Accounts',
+        tooltip: 'Active: 100% zakatable · Passive: 30% zakatable · Dividends: 100% zakatable'
       }
     }
 
