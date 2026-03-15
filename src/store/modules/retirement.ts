@@ -180,9 +180,18 @@ export const createRetirementSlice: StateCreator<
       name: '',
       accountType,
       balance: 0,
+      preciousMetals: 0,
+      cash: 0,
       taxRate: meta.defaultTaxRate,
       penaltyRate: meta.defaultPenaltyRate,
       isAccessible: !meta.isLocked,
+      treatment: 'cash',
+      active: 0,
+      passive: 0,
+      dividends: 0,
+      isTaxDifferentiated: false,
+      principal: 0,
+      gains: 0,
     }
     set((state) => ({
       retirement: {

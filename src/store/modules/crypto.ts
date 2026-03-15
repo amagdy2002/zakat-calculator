@@ -29,35 +29,46 @@ export const createCryptoSlice: StateCreator<
   lastError: null,
 
   // Actions
-  addCoin: async (symbol: string, quantity: number, currency: string = 'USD') => {
-    if (typeof quantity !== 'number' || !isFinite(quantity) || quantity < 0) {
+  addCoin: async (symbol: string, amount: number, currency: string = 'USD', inputMode: 'quantity' | 'value' = 'quantity') => {
+    if (typeof amount !== 'number' || !isFinite(amount) || amount < 0) {
       set({
-        lastError: 'Invalid quantity. Please enter a valid positive number.'
+        lastError: 'Invalid amount. Please enter a valid positive number.'
       })
       return
     }
 
     set({ isLoading: true, lastError: null })
 
+    // Derive quantity and marketValue depending on input mode
+    const resolveAmounts = (price: number) => {
+      if (inputMode === 'value') {
+        const qty = price > 0 ? amount / price : 0
+        return { quantity: qty, marketValue: amount }
+      }
+      return { quantity: amount, marketValue: roundCurrency(amount * price) }
+    }
+
     try {
-      console.log(`Adding ${quantity} ${symbol} in ${currency}`);
+      console.log(`Adding ${amount} (${inputMode}) of ${symbol} in ${currency}`);
       const currentPrice = await getCryptoPrice(symbol, currency)
 
       if (currentPrice === 0 && (symbol.toUpperCase() === 'BTC' || symbol.toUpperCase() === 'ETH')) {
         console.warn(`Received zero price for ${symbol}, using fallback price`);
-        // Use fallback prices for major coins if API returns zero
-        const marketValue = roundCurrency(quantity * FALLBACK_PRICES[symbol.toUpperCase()]);
+        const fallbackPrice = FALLBACK_PRICES[symbol.toUpperCase()]
+        const { quantity, marketValue } = resolveAmounts(fallbackPrice)
         const zakatDue = roundCurrency(marketValue * ZAKAT_RATE);
 
         set((state: ZakatState) => {
           const newCoins = [...state.cryptoValues.coins, {
             symbol: symbol.toUpperCase(),
             quantity,
-            currentPrice: FALLBACK_PRICES[symbol.toUpperCase()],
+            currentPrice: fallbackPrice,
             marketValue,
             zakatDue,
             currency,
-            isFallback: true
+            isFallback: true,
+            inputMode,
+            inputValue: amount
           }]
 
           const total = roundCurrency(newCoins.reduce((sum: number, coin: CryptoHolding) => sum + coin.marketValue, 0))
@@ -77,17 +88,20 @@ export const createCryptoSlice: StateCreator<
         return;
       }
 
-      const marketValue = roundCurrency(quantity * currentPrice)
-      const zakatDue = roundCurrency(marketValue * ZAKAT_RATE)
+      const { quantity, marketValue } = resolveAmounts(currentPrice)
+      const roundedMarketValue = roundCurrency(marketValue)
+      const zakatDue = roundCurrency(roundedMarketValue * ZAKAT_RATE)
 
       set((state: ZakatState) => {
         const newCoins = [...state.cryptoValues.coins, {
           symbol: symbol.toUpperCase(),
           quantity,
           currentPrice: roundCurrency(currentPrice),
-          marketValue,
+          marketValue: roundedMarketValue,
           zakatDue,
-          currency
+          currency,
+          inputMode,
+          inputValue: amount
         }]
 
         const total = roundCurrency(newCoins.reduce((sum: number, coin: CryptoHolding) => sum + coin.marketValue, 0))
@@ -109,18 +123,21 @@ export const createCryptoSlice: StateCreator<
       // For major coins, add with fallback price if API fails
       if (symbol.toUpperCase() === 'BTC' || symbol.toUpperCase() === 'ETH') {
         console.log(`Using fallback price for ${symbol} due to API error`);
-        const marketValue = roundCurrency(quantity * FALLBACK_PRICES[symbol.toUpperCase()]);
+        const fallbackPrice = FALLBACK_PRICES[symbol.toUpperCase()]
+        const { quantity: resolvedQty, marketValue } = resolveAmounts(fallbackPrice)
         const zakatDue = roundCurrency(marketValue * ZAKAT_RATE);
 
         set((state: ZakatState) => {
           const newCoins = [...state.cryptoValues.coins, {
             symbol: symbol.toUpperCase(),
-            quantity,
-            currentPrice: FALLBACK_PRICES[symbol.toUpperCase()],
+            quantity: resolvedQty,
+            currentPrice: fallbackPrice,
             marketValue,
             zakatDue,
             currency,
-            isFallback: true
+            isFallback: true,
+            inputMode,
+            inputValue: amount
           }]
 
           const total = roundCurrency(newCoins.reduce((sum: number, coin: CryptoHolding) => sum + coin.marketValue, 0))

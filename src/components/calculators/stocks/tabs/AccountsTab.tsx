@@ -54,16 +54,20 @@ function AccountCard({
     const [activeInput, setActiveInput] = useState(account.active > 0 ? String(account.active) : '')
     const [passiveInput, setPassiveInput] = useState(account.passive > 0 ? String(account.passive) : '')
     const [dividendsInput, setDividendsInput] = useState(account.dividends > 0 ? String(account.dividends) : '')
+    const [preciousMetalsInput, setPreciousMetalsInput] = useState(account.preciousMetals > 0 ? String(account.preciousMetals) : '')
+    const [cashInput, setCashInput] = useState(account.cash > 0 ? String(account.cash) : '')
 
     const active = parseAmount(activeInput)
     const passive = parseAmount(passiveInput)
     const dividends = parseAmount(dividendsInput)
+    const preciousMetals = parseAmount(preciousMetalsInput)
+    const cash = parseAmount(cashInput)
 
-    const totalValue = active + passive + dividends
-    const zakatableValue = active + passive * PASSIVE_FUND_RATE + dividends
+    const totalValue = active + passive + dividends + preciousMetals + cash
+    const zakatableValue = active + passive * PASSIVE_FUND_RATE + dividends + preciousMetals + cash
     const zakatDue = hawlMet ? zakatableValue * 0.025 : 0
 
-    function handleNumericBlur(field: 'active' | 'passive' | 'dividends', raw: string) {
+    function handleNumericBlur(field: 'active' | 'passive' | 'dividends' | 'preciousMetals' | 'cash', raw: string) {
         const val = parseAmount(raw)
         onUpdate(field, val)
     }
@@ -131,8 +135,8 @@ function AccountCard({
                         className="overflow-hidden"
                     >
                         <div className="px-4 py-4 space-y-4">
-                            {/* Three input fields */}
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            {/* Four input fields */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 {/* Active */}
                                 <div className="space-y-1.5">
                                     <div className="flex items-center gap-1.5">
@@ -219,6 +223,64 @@ function AccountCard({
                                         />
                                     </div>
                                 </div>
+
+                                {/* Precious Metals */}
+                                <div className="space-y-1.5">
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="inline-block w-2 h-2 rounded-full bg-amber-400" />
+                                        <Label htmlFor={`precious-metals-${account.id}`} className="text-xs font-medium text-gray-700">
+                                            Precious Metals
+                                        </Label>
+                                    </div>
+                                    <p className="text-xs text-gray-400">100% zakatable</p>
+                                    <div className="relative">
+                                        <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                                            <span className="text-xs font-medium text-gray-500">{currency}</span>
+                                        </div>
+                                        <Input
+                                            id={`precious-metals-${account.id}`}
+                                            type="text"
+                                            inputMode="decimal"
+                                            className="pl-12 text-sm"
+                                            value={preciousMetalsInput}
+                                            onChange={(e) => {
+                                                const v = e.target.value
+                                                if (/^[\d.,]*$/.test(v) || v === '') setPreciousMetalsInput(v)
+                                            }}
+                                            onBlur={() => handleNumericBlur('preciousMetals', preciousMetalsInput)}
+                                            placeholder="0.00"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Cash Holdings */}
+                                <div className="space-y-1.5">
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="inline-block w-2 h-2 rounded-full bg-teal-500" />
+                                        <Label htmlFor={`cash-${account.id}`} className="text-xs font-medium text-gray-700">
+                                            Cash Holdings
+                                        </Label>
+                                    </div>
+                                    <p className="text-xs text-gray-400">100% zakatable</p>
+                                    <div className="relative">
+                                        <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                                            <span className="text-xs font-medium text-gray-500">{currency}</span>
+                                        </div>
+                                        <Input
+                                            id={`cash-${account.id}`}
+                                            type="text"
+                                            inputMode="decimal"
+                                            className="pl-12 text-sm"
+                                            value={cashInput}
+                                            onChange={(e) => {
+                                                const v = e.target.value
+                                                if (/^[\d.,]*$/.test(v) || v === '') setCashInput(v)
+                                            }}
+                                            onBlur={() => handleNumericBlur('cash', cashInput)}
+                                            placeholder="0.00"
+                                        />
+                                    </div>
+                                </div>
                             </div>
 
                             {/* Per-account mini summary */}
@@ -263,9 +325,9 @@ export function AccountsTab({
     onUpdateAccount,
     hawlMet,
 }: AccountsTabProps) {
-    const totalValue = accounts.reduce((s, a) => s + a.active + a.passive + a.dividends, 0)
+    const totalValue = accounts.reduce((s, a) => s + a.active + a.passive + a.dividends + (a.preciousMetals || 0) + (a.cash || 0), 0)
     const zakatableValue = accounts.reduce(
-        (s, a) => s + a.active + a.passive * PASSIVE_FUND_RATE + a.dividends,
+        (s, a) => s + a.active + a.passive * PASSIVE_FUND_RATE + a.dividends + (a.preciousMetals || 0) + (a.cash || 0),
         0
     )
     const zakatDue = hawlMet ? zakatableValue * 0.025 : 0

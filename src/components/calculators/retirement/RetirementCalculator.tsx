@@ -14,7 +14,7 @@ import { useCalculatorReset } from '@/hooks/useCalculatorReset'
 import { RetirementAccountCard } from './RetirementAccountCard'
 import { RetirementAccount, RetirementAccountType, RETIREMENT_ACCOUNT_META } from '@/store/modules/retirement.types'
 import { formatCurrency as formatCurrencyBase } from '@/lib/utils'
-import { retirement as retirementAsset } from '@/lib/assets/retirement'
+import { retirement as retirementAsset, getAccountTotal, getAccountZakatable } from '@/lib/assets/retirement'
 
 // ─── FAQ items covering all account types ────────────────────────────────────
 
@@ -79,13 +79,7 @@ const RETIREMENT_FAQ = {
 
 // ─── Grand total footer helpers ──────────────────────────────────────────────
 
-function netZakatable(account: RetirementAccount): number {
-  const meta = RETIREMENT_ACCOUNT_META[account.accountType]
-  if (meta.isLocked && !account.isAccessible) return 0
-  const bal = account.balance
-  if (!meta.zakatOnNet) return bal
-  return Math.max(0, bal * (1 - account.taxRate / 100 - account.penaltyRate / 100))
-}
+// Used imported methods for total and zakatable calculations.
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -151,8 +145,8 @@ export function RetirementCalculator({
 
   // Aggregate totals for the footer
   const accounts = retirementValues.retirementAccounts || []
-  const totalBalance = accounts.reduce((s, a) => s + (a.balance || 0), 0)
-  const totalZakatable = accounts.reduce((s, a) => s + netZakatable(a), 0)
+  const totalBalance = accounts.reduce((s, a) => s + getAccountTotal(a), 0)
+  const totalZakatable = accounts.reduce((s, a) => s + getAccountZakatable(a), 0)
   const totalZakatDue = totalZakatable * 0.025
   const hasLocked = accounts.some(
     (a) => RETIREMENT_ACCOUNT_META[a.accountType].isLocked && !a.isAccessible

@@ -15,32 +15,32 @@ describe('Metals Calculator Validation', () => {
   const metalsValidation = createCalculatorValidation<MetalsValues>({
     name: 'Metals Calculator',
     requiredFields: [
-      'gold_regular',
-      'gold_occasional',
       'gold_investment',
-      'silver_regular',
-      'silver_occasional',
-      'silver_investment'
+      'gold_investment_purity',
+      'gold_investment_input_mode',
+      'gold_investment_value',
+      'silver_investment',
+      'silver_investment_input_mode',
+      'silver_investment_value'
     ],
     numericalFields: [
-      'gold_regular',
-      'gold_occasional',
       'gold_investment',
-      'silver_regular',
-      'silver_occasional',
-      'silver_investment'
+      'gold_investment_value',
+      'silver_investment',
+      'silver_investment_value'
     ]
   })
 
   describe('validateValues', () => {
     it('should validate valid metals values', () => {
       const validValues: MetalsValues = {
-        gold_regular: 50,
-        gold_occasional: 25,
         gold_investment: 100,
-        silver_regular: 500,
-        silver_occasional: 250,
-        silver_investment: 1000
+        gold_investment_purity: '24K',
+        gold_investment_input_mode: 'weight',
+        gold_investment_value: 0,
+        silver_investment: 1000,
+        silver_investment_input_mode: 'weight',
+        silver_investment_value: 0
       }
 
       expect(metalsValidation.validateValues(validValues)).toBe(true)
@@ -48,12 +48,13 @@ describe('Metals Calculator Validation', () => {
 
     it('should validate zero values', () => {
       const zeroValues: MetalsValues = {
-        gold_regular: 0,
-        gold_occasional: 0,
         gold_investment: 0,
-        silver_regular: 0,
-        silver_occasional: 0,
-        silver_investment: 0
+        gold_investment_purity: '24K',
+        gold_investment_input_mode: 'weight',
+        gold_investment_value: 0,
+        silver_investment: 0,
+        silver_investment_input_mode: 'weight',
+        silver_investment_value: 0
       }
 
       expect(metalsValidation.validateValues(zeroValues)).toBe(true)
@@ -61,12 +62,13 @@ describe('Metals Calculator Validation', () => {
 
     it('should reject negative values', () => {
       const negativeValues: MetalsValues = {
-        gold_regular: -10,
-        gold_occasional: 25,
-        gold_investment: 100,
-        silver_regular: 500,
-        silver_occasional: 250,
-        silver_investment: 1000
+        gold_investment: -100,
+        gold_investment_purity: '24K',
+        gold_investment_input_mode: 'weight',
+        gold_investment_value: 0,
+        silver_investment: 1000,
+        silver_investment_input_mode: 'weight',
+        silver_investment_value: 0
       }
 
       expect(metalsValidation.validateValues(negativeValues)).toBe(false)
@@ -74,8 +76,8 @@ describe('Metals Calculator Validation', () => {
 
     it('should reject missing required fields', () => {
       const missingFields: Partial<MetalsValues> = {
-        gold_regular: 50,
-        gold_occasional: 25
+        gold_investment: 100,
+        gold_investment_purity: '24K'
         // Missing other required fields
       }
 
@@ -84,28 +86,25 @@ describe('Metals Calculator Validation', () => {
 
     it('should reject non-numeric values', () => {
       const invalidTypes = {
-        gold_regular: '50' as any,
-        gold_occasional: 25,
-        gold_investment: 100,
-        silver_regular: 500,
-        silver_occasional: 250,
-        silver_investment: 1000
+        gold_investment: '100' as any,
+        gold_investment_purity: '24K',
+        gold_investment_input_mode: 'weight',
+        gold_investment_value: 0,
+        silver_investment: 1000,
+        silver_investment_input_mode: 'weight',
+        silver_investment_value: 0
       }
 
-      expect(metalsValidation.validateValues(invalidTypes)).toBe(false)
+      expect(metalsValidation.validateValues(invalidTypes as any)).toBe(false)
     })
   })
 
   describe('validateCalculations', () => {
     it('should validate matching totals', () => {
-      const total = 1925 // Total grams
+      const total = 1100 // Total grams
       const breakdown = {
         items: {
-          gold_regular: { value: 50, weight: 50 },
-          gold_occasional: { value: 25, weight: 25 },
           gold_investment: { value: 100, weight: 100 },
-          silver_regular: { value: 500, weight: 500 },
-          silver_occasional: { value: 250, weight: 250 },
           silver_investment: { value: 1000, weight: 1000 }
         }
       }
@@ -117,11 +116,7 @@ describe('Metals Calculator Validation', () => {
       const total = 2000 // Incorrect total
       const breakdown = {
         items: {
-          gold_regular: { value: 50, weight: 50 },
-          gold_occasional: { value: 25, weight: 25 },
           gold_investment: { value: 100, weight: 100 },
-          silver_regular: { value: 500, weight: 500 },
-          silver_occasional: { value: 250, weight: 250 },
           silver_investment: { value: 1000, weight: 1000 }
         }
       }
@@ -130,14 +125,10 @@ describe('Metals Calculator Validation', () => {
     })
 
     it('should handle floating point weights correctly', () => {
-      const total = 100.50
+      const total = 40.05
       const breakdown = {
         items: {
-          gold_regular: { value: 20.25, weight: 20.25 },
-          gold_occasional: { value: 15.10, weight: 15.10 },
           gold_investment: { value: 25.05, weight: 25.05 },
-          silver_regular: { value: 15.05, weight: 15.05 },
-          silver_occasional: { value: 10.05, weight: 10.05 },
           silver_investment: { value: 15, weight: 15 }
         }
       }
@@ -149,12 +140,13 @@ describe('Metals Calculator Validation', () => {
   describe('validateZakatableAmount', () => {
     it('should validate when hawl is met', () => {
       const values: MetalsValues = {
-        gold_regular: 50,
-        gold_occasional: 25,
         gold_investment: 100,
-        silver_regular: 500,
-        silver_occasional: 250,
-        silver_investment: 1000
+        gold_investment_purity: '24K',
+        gold_investment_input_mode: 'weight',
+        gold_investment_value: 0,
+        silver_investment: 1000,
+        silver_investment_input_mode: 'weight',
+        silver_investment_value: 0
       }
 
       expect(metalsValidation.validateZakatableAmount(values, true)).toBe(true)
@@ -162,12 +154,13 @@ describe('Metals Calculator Validation', () => {
 
     it('should validate when hawl is not met', () => {
       const values: MetalsValues = {
-        gold_regular: 50,
-        gold_occasional: 25,
         gold_investment: 100,
-        silver_regular: 500,
-        silver_occasional: 250,
-        silver_investment: 1000
+        gold_investment_purity: '24K',
+        gold_investment_input_mode: 'weight',
+        gold_investment_value: 0,
+        silver_investment: 1000,
+        silver_investment_input_mode: 'weight',
+        silver_investment_value: 0
       }
 
       expect(metalsValidation.validateZakatableAmount(values, false)).toBe(true)

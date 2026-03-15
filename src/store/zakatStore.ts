@@ -16,15 +16,13 @@ import { DEFAULT_HAWL_STATUS } from './constants'
 const initialState: Partial<ZakatState> = {
   currency: 'USD', // Default currency
   metalsValues: {
-    gold_regular: 0,
-    gold_regular_purity: '24K',
-    gold_occasional: 0,
-    gold_occasional_purity: '24K',
     gold_investment: 0,
     gold_investment_purity: '24K',
-    silver_regular: 0,
-    silver_occasional: 0,
-    silver_investment: 0
+    gold_investment_input_mode: 'weight',
+    gold_investment_value: 0,
+    silver_investment: 0,
+    silver_investment_input_mode: 'weight',
+    silver_investment_value: 0
   },
   cashValues: {
     cash_on_hand: 0,
@@ -662,15 +660,13 @@ export const useZakatStore = create<ZakatState>()(
           set((state) => ({
             // Reset metals values
             metalsValues: {
-              gold_regular: 0,
-              gold_regular_purity: '24K',
-              gold_occasional: 0,
-              gold_occasional_purity: '24K',
               gold_investment: 0,
               gold_investment_purity: '24K',
-              silver_regular: 0,
-              silver_occasional: 0,
-              silver_investment: 0
+              gold_investment_input_mode: 'weight',
+              gold_investment_value: 0,
+              silver_investment: 0,
+              silver_investment_input_mode: 'weight',
+              silver_investment_value: 0
             },
             // Reset cash values
             cashValues: {

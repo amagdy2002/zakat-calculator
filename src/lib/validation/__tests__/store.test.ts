@@ -29,15 +29,13 @@ describe('Store Validation Tests', () => {
           foreign_currency: 0
         },
         metalsValues: {
-          gold_regular: 0,
-          gold_regular_purity: '24K',
-          gold_occasional: 0,
-          gold_occasional_purity: '24K',
           gold_investment: 0,
           gold_investment_purity: '24K',
-          silver_regular: 0,
-          silver_occasional: 0,
-          silver_investment: 0
+          gold_investment_input_mode: 'weight',
+          gold_investment_value: 0,
+          silver_investment: 0,
+          silver_investment_input_mode: 'weight',
+          silver_investment_value: 0
         },
         stockValues: {
           activeStocks: [],
@@ -93,15 +91,13 @@ describe('Store Validation Tests', () => {
           foreign_currency: 0
         },
         metalsValues: {
-          gold_regular: 0,
-          gold_regular_purity: '24K',
-          gold_occasional: 0,
-          gold_occasional_purity: '24K',
           gold_investment: 0,
           gold_investment_purity: '24K',
-          silver_regular: 0,
-          silver_occasional: 0,
-          silver_investment: 0
+          gold_investment_input_mode: 'weight',
+          gold_investment_value: 0,
+          silver_investment: 0,
+          silver_investment_input_mode: 'weight',
+          silver_investment_value: 0
         },
         stockValues: {
           activeStocks: [],

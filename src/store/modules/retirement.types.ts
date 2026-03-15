@@ -21,6 +21,7 @@ export type RetirementAccountType =
     | 'pension'
     | '457b'
     | 'after_tax'
+    | 'precious_metals'
     | 'other'
 
 export type TaxTreatment = 'pre_tax' | 'after_tax' | 'roth' | 'exempt'
@@ -165,6 +166,17 @@ export const RETIREMENT_ACCOUNT_META: Record<RetirementAccountType, RetirementAc
         taxNote: 'Contributions are made with already-taxed money. Capital gains tax may apply on earnings when sold, but the principal is not taxed again.',
         zakatNote: 'Full balance is zakatable — contributions were already taxed. Gains are included in the zakatable amount.',
     },
+    precious_metals: {
+        label: 'Precious Metals (Gold / Silver)',
+        shortLabel: 'Precious Metals',
+        taxTreatment: 'after_tax',
+        defaultTaxRate: 0,
+        defaultPenaltyRate: 0,
+        zakatOnNet: false,
+        isLocked: false,
+        taxNote: 'Physical investment gold or silver held outside of a retirement wrapper. No tax or penalty deductions apply for Zakat purposes.',
+        zakatNote: '100% of the market value is zakatable — precious metals are fully zakatable assets in Islamic jurisprudence.',
+    },
     other: {
         label: 'Other Retirement Account',
         shortLabel: 'Other',
@@ -183,10 +195,20 @@ export interface RetirementAccount {
     name: string
     accountType: RetirementAccountType
     balance: number
+    preciousMetals: number
+    cash: number
     /** User-overridable tax rate (%) */
     taxRate: number
     /** User-overridable penalty rate (%) */
     penaltyRate: number
     /** true = funds can be accessed now without penalty (age ≥ 59½ or exempt) */
     isAccessible: boolean
+
+    treatment: 'cash' | 'investment'
+    active: number
+    passive: number
+    dividends: number
+    isTaxDifferentiated: boolean
+    principal: number
+    gains: number
 }

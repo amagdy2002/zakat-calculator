@@ -25,9 +25,11 @@ export interface StockHolding {
 export interface StockAccount {
   id: string
   name: string
-  active: number    // active trading value — 100% zakatable
-  passive: number   // passive/long-term value — 30% zakatable
-  dividends: number // dividend earnings — 100% zakatable
+  active: number          // active trading value — 100% zakatable
+  passive: number         // passive/long-term value — 30% zakatable
+  dividends: number       // dividend earnings — 100% zakatable
+  preciousMetals: number  // physical precious metals held — 100% zakatable
+  cash: number            // cash holdings in this account — 100% zakatable
 }
 
 export interface StockValues {
@@ -104,7 +106,7 @@ export const stocks: AssetType = {
     // Per-account totals
     const accountsTotal = Array.isArray(values.stockAccounts)
       ? values.stockAccounts.reduce((sum, acc) =>
-        sum + safeCalculate(acc.active) + safeCalculate(acc.passive) + safeCalculate(acc.dividends), 0)
+        sum + safeCalculate(acc.active) + safeCalculate(acc.passive) + safeCalculate(acc.dividends) + safeCalculate(acc.preciousMetals) + safeCalculate(acc.cash), 0)
       : 0
 
     // Return total, ensuring it's a valid number
@@ -137,13 +139,15 @@ export const stocks: AssetType = {
       ? (values.is_passive_fund ? fundValue * PASSIVE_FUND_RATE : fundValue)
       : 0
 
-    // Per-account zakatable: active=100%, passive=30%, dividends=100%
+    // Per-account zakatable: active=100%, passive=30%, dividends=100%, preciousMetals=100%, cash=100%
     const accountsZakatable = hawlMet && Array.isArray(values.stockAccounts)
       ? values.stockAccounts.reduce((sum, acc) =>
         sum +
         safeCalculate(acc.active) +
         safeCalculate(acc.passive) * PASSIVE_FUND_RATE +
-        safeCalculate(acc.dividends), 0)
+        safeCalculate(acc.dividends) +
+        safeCalculate(acc.preciousMetals) +
+        safeCalculate(acc.cash), 0)
       : 0
 
     // Return total zakatable amount, ensuring it's a valid number
@@ -192,9 +196,13 @@ export const stocks: AssetType = {
       ? values.stockAccounts.reduce((sum, acc) => sum + safeCalculate(acc.passive), 0) : 0
     const accountsDividends = Array.isArray(values.stockAccounts)
       ? values.stockAccounts.reduce((sum, acc) => sum + safeCalculate(acc.dividends), 0) : 0
-    const accountsTotal = accountsActive + accountsPassive + accountsDividends
+    const accountsPreciousMetals = Array.isArray(values.stockAccounts)
+      ? values.stockAccounts.reduce((sum, acc) => sum + safeCalculate(acc.preciousMetals), 0) : 0
+    const accountsCash = Array.isArray(values.stockAccounts)
+      ? values.stockAccounts.reduce((sum, acc) => sum + safeCalculate(acc.cash), 0) : 0
+    const accountsTotal = accountsActive + accountsPassive + accountsDividends + accountsPreciousMetals + accountsCash
     const accountsZakatable = hawlMet
-      ? accountsActive + accountsPassive * PASSIVE_FUND_RATE + accountsDividends
+      ? accountsActive + accountsPassive * PASSIVE_FUND_RATE + accountsDividends + accountsPreciousMetals + accountsCash
       : 0
     const accountsZakatDue = accountsZakatable * ZAKAT_RATE
 
@@ -251,7 +259,7 @@ export const stocks: AssetType = {
         zakatable: accountsZakatable,
         zakatDue: accountsZakatDue,
         label: 'Investment Accounts',
-        tooltip: 'Active: 100% zakatable · Passive: 30% zakatable · Dividends: 100% zakatable'
+        tooltip: 'Active: 100% zakatable · Passive: 30% zakatable · Dividends: 100% zakatable · Precious Metals: 100% zakatable · Cash: 100% zakatable'
       }
     }
 

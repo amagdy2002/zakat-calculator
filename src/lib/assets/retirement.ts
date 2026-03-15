@@ -10,13 +10,59 @@
 import { AssetType, AssetBreakdown, AssetBreakdownItem, ZAKAT_RATE, safeCalculate } from './types'
 import { formatCurrency } from '@/lib/utils/currency'
 import { RetirementValues } from '@/store/types'
-import { RETIREMENT_ACCOUNT_META } from '@/store/modules/retirement.types'
+import { RETIREMENT_ACCOUNT_META, RetirementAccount } from '@/store/modules/retirement.types'
 
-/** Calculate net withdrawable amount for a single retirement account. */
-function netWithdrawable(balance: number, taxRate: number, penaltyRate: number, zakatOnNet: boolean): number {
-  if (!zakatOnNet) return balance
-  const net = balance * (1 - taxRate / 100 - penaltyRate / 100)
-  return Math.max(0, net)
+/** Calculate total value for a single retirement account. */
+export function getAccountTotal(acc: RetirementAccount): number {
+  let val = 0
+  if (acc.treatment === 'investment') {
+    val = safeCalculate(acc.active) + safeCalculate(acc.passive) + safeCalculate(acc.dividends)
+  } else {
+    if (acc.isTaxDifferentiated) {
+      val = safeCalculate(acc.principal) + safeCalculate(acc.gains)
+    } else {
+      val = safeCalculate(acc.balance)
+    }
+  }
+  return val + safeCalculate(acc.preciousMetals) + safeCalculate(acc.cash)
+}
+
+/** Calculate net zakatable amount for a single retirement account. */
+export function getAccountZakatable(acc: RetirementAccount): number {
+  const meta = RETIREMENT_ACCOUNT_META[acc.accountType]
+  if (meta.isLocked && !acc.isAccessible) return 0
+  
+  let grossZakatable = 0
+
+  if (acc.treatment === 'investment') {
+    const active = safeCalculate(acc.active)
+    const passive = safeCalculate(acc.passive)
+    const dividends = safeCalculate(acc.dividends)
+    grossZakatable = active + (passive * 0.3) + dividends
+  } else {
+    if (acc.isTaxDifferentiated) {
+      grossZakatable = safeCalculate(acc.principal) + safeCalculate(acc.gains)
+    } else {
+      grossZakatable = safeCalculate(acc.balance)
+    }
+  }
+
+  // add cash and metals (100% zakatable)
+  grossZakatable += safeCalculate(acc.preciousMetals) + safeCalculate(acc.cash)
+  
+  let netZakatable = grossZakatable
+  if (meta.zakatOnNet) {
+    if (acc.isTaxDifferentiated) {
+       const gains = safeCalculate(acc.gains)
+       const taxFactor = (acc.taxRate / 100) + (acc.penaltyRate / 100)
+       const taxOnGains = gains * taxFactor
+       netZakatable -= taxOnGains
+    } else {
+       const taxFactor = (acc.taxRate / 100) + (acc.penaltyRate / 100)
+       netZakatable *= (1 - taxFactor)
+    }
+  }
+  return Math.max(0, netZakatable)
 }
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
@@ -40,7 +86,7 @@ export const retirement: AssetType = {
     const otherRetirement = safeCalculate(values.other_retirement)
 
     const accountsTotal = Array.isArray(values.retirementAccounts)
-      ? values.retirementAccounts.reduce((sum, acc) => sum + safeCalculate(acc.balance), 0)
+      ? values.retirementAccounts.reduce((sum, acc) => sum + getAccountTotal(acc), 0)
       : 0
 
     return traditional401k + traditionalIRA + roth401k + rothIRA + pension + otherRetirement + accountsTotal
@@ -67,13 +113,7 @@ export const retirement: AssetType = {
 
     // Per-account zakatable: locked accounts are deferred
     const accountsZakatable = Array.isArray(values.retirementAccounts)
-      ? values.retirementAccounts.reduce((sum, acc) => {
-        const meta = RETIREMENT_ACCOUNT_META[acc.accountType]
-        if (meta.isLocked && !acc.isAccessible) return sum
-        const bal = safeCalculate(acc.balance)
-        const net = netWithdrawable(bal, acc.taxRate, acc.penaltyRate, meta.zakatOnNet)
-        return sum + net
-      }, 0)
+      ? values.retirementAccounts.reduce((sum, acc) => sum + getAccountZakatable(acc), 0)
       : 0
 
     return hawlMet ? (netAmount + otherRetirement + accountsZakatable) : 0
@@ -125,15 +165,10 @@ export const retirement: AssetType = {
 
     // Per-account breakdown
     const accountsTotal = Array.isArray(values.retirementAccounts)
-      ? values.retirementAccounts.reduce((sum, acc) => sum + safeCalculate(acc.balance), 0)
+      ? values.retirementAccounts.reduce((sum, acc) => sum + getAccountTotal(acc), 0)
       : 0
     const accountsZakatable = Array.isArray(values.retirementAccounts)
-      ? values.retirementAccounts.reduce((sum, acc) => {
-        const meta = RETIREMENT_ACCOUNT_META[acc.accountType]
-        if (meta.isLocked && !acc.isAccessible) return sum
-        const bal = safeCalculate(acc.balance)
-        return sum + netWithdrawable(bal, acc.taxRate, acc.penaltyRate, meta.zakatOnNet)
-      }, 0)
+      ? values.retirementAccounts.reduce((sum, acc) => sum + getAccountZakatable(acc), 0)
       : 0
 
     // Calculate totals
@@ -146,12 +181,24 @@ export const retirement: AssetType = {
     const penaltyAmount = traditionalTotal * penaltyRate
     const netAmount = traditionalTotal - taxAmount - penaltyAmount
 
-    // Total zakatable is the net amount of accessible funds plus any withdrawn amounts
+    // Total zakatable is the net amount of accessible funds plus any withdrawn amounts and per-account components
     const zakatable = hawlMet ? (netAmount + otherZakatable + accountsZakatable) : 0
     const zakatDue = zakatable * ZAKAT_RATE
 
     // Create breakdown with detailed information
     const items: Record<string, AssetBreakdownItem> = {}
+
+    // Add per-account accounts breakdown if any exist
+    if (accountsTotal > 0 || (Array.isArray(values.retirementAccounts) && values.retirementAccounts.length > 0)) {
+      items.retirement_accounts = {
+        value: accountsTotal,
+        isZakatable: hawlMet,
+        zakatable: accountsZakatable,
+        zakatDue: accountsZakatable * ZAKAT_RATE,
+        label: 'Retirement Profile',
+        tooltip: 'Includes net balance + 100% of cash & precious metals'
+      }
+    }
 
     // Always add traditional accounts, even if zero
     items.traditional_accounts = {

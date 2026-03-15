@@ -1,5 +1,5 @@
 import { StateCreator } from 'zustand'
-import { ZakatState, CashValues, ForeignCurrencyEntry } from '../types'
+import { ZakatState, CashValues, ForeignCurrencyEntry, BankAccount } from '../types'
 import { getAssetType } from '@/lib/assets/registry'
 import { ZAKAT_RATE } from '@/lib/constants'
 import { roundCurrency, formatCurrency, isValidCurrencyAmount } from '@/lib/utils/currency'
@@ -7,12 +7,15 @@ import { roundCurrency, formatCurrency, isValidCurrencyAmount } from '@/lib/util
 export interface CashSlice {
   cashValues: CashValues
   cashHawlMet: boolean
-  setCashValue: (key: keyof CashValues, value: number | ForeignCurrencyEntry[]) => void
+  setCashValue: (key: keyof CashValues, value: number | ForeignCurrencyEntry[] | BankAccount[]) => void
   setCashHawlMet: (value: boolean) => void
   resetCashValues: () => void
   getTotalCash: () => number
   getTotalZakatableCash: () => number
   updateCashValues: (values: Partial<CashValues>) => void
+  addBankAccount: () => void
+  removeBankAccount: (id: string) => void
+  updateBankAccount: (id: string, updates: Partial<Omit<BankAccount, 'id'>>) => void
   getCashBreakdown: () => {
     total: number
     zakatable: number
@@ -34,7 +37,8 @@ const initialCashValues: CashValues = {
   savings_account: 0,
   digital_wallets: 0,
   foreign_currency: 0,
-  foreign_currency_entries: []
+  foreign_currency_entries: [],
+  bank_accounts: []
 }
 
 export const createCashSlice: StateCreator<
@@ -53,29 +57,27 @@ export const createCashSlice: StateCreator<
         console.warn(`Invalid foreign_currency_entries value:`, value);
         return;
       }
+      set((state: ZakatState) => ({
+        cashValues: {
+          ...state.cashValues,
+          foreign_currency_entries: value as ForeignCurrencyEntry[]
+        }
+      }));
+      return;
+    }
 
-      // Debug logging - commented out but preserved
-      // console.log('Setting foreign_currency_entries in store:', value);
-
-      set((state: ZakatState) => {
-        const newState = {
-          cashValues: {
-            ...state.cashValues,
-            foreign_currency_entries: value
-          }
-        };
-
-        // Log the update for debugging - commented out but preserved
-        /* 
-        console.log('Updated cashValues with foreign_currency_entries:', {
-          before: state.cashValues?.foreign_currency_entries?.length || 0,
-          after: value.length,
-          timestamp: new Date().toISOString()
-        });
-        */
-
-        return newState;
-      });
+    // Special handling for bank_accounts
+    if (key === 'bank_accounts') {
+      if (!Array.isArray(value)) {
+        console.warn(`Invalid bank_accounts value:`, value);
+        return;
+      }
+      set((state: ZakatState) => ({
+        cashValues: {
+          ...state.cashValues,
+          bank_accounts: value as BankAccount[]
+        }
+      }));
       return;
     }
 
@@ -158,6 +160,39 @@ export const createCashSlice: StateCreator<
     cashValues: initialCashValues,
     cashHawlMet: true
   }),
+
+  addBankAccount: () => {
+    const id = crypto.randomUUID()
+    set((state: ZakatState) => ({
+      cashValues: {
+        ...state.cashValues,
+        bank_accounts: [
+          ...(state.cashValues.bank_accounts || []),
+          { id, name: 'Bank Account', balance: 0 }
+        ]
+      }
+    }))
+  },
+
+  removeBankAccount: (id: string) => {
+    set((state: ZakatState) => ({
+      cashValues: {
+        ...state.cashValues,
+        bank_accounts: (state.cashValues.bank_accounts || []).filter(a => a.id !== id)
+      }
+    }))
+  },
+
+  updateBankAccount: (id: string, updates: Partial<Omit<BankAccount, 'id'>>) => {
+    set((state: ZakatState) => ({
+      cashValues: {
+        ...state.cashValues,
+        bank_accounts: (state.cashValues.bank_accounts || []).map(a =>
+          a.id === id ? { ...a, ...updates } : a
+        )
+      }
+    }))
+  },
 
   getTotalCash: () => {
     const state = get()

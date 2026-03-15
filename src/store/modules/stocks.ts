@@ -697,6 +697,8 @@ export const createStocksSlice: StateCreator<ZakatState, [], [], any> = (set, ge
       active: 0,
       passive: 0,
       dividends: 0,
+      preciousMetals: 0,
+      cash: 0,
     }
     set((state) => ({
       stockValues: {
@@ -744,14 +746,16 @@ export const createStocksSlice: StateCreator<ZakatState, [], [], any> = (set, ge
     // Get dividend total
     const dividendTotal = state.stockValues?.total_dividend_earnings || 0
 
-    // Get per-account totals (active + passive + dividends per account)
+    // Get per-account totals (active + passive + dividends + preciousMetals + cash per account)
     const accountsTotal = Array.isArray(state.stockValues?.stockAccounts)
       ? state.stockValues.stockAccounts.reduce(
         (sum: number, acc: StockAccount) =>
           sum +
           (Number.isFinite(acc.active) ? acc.active : 0) +
           (Number.isFinite(acc.passive) ? acc.passive : 0) +
-          (Number.isFinite(acc.dividends) ? acc.dividends : 0),
+          (Number.isFinite(acc.dividends) ? acc.dividends : 0) +
+          (Number.isFinite(acc.preciousMetals) ? acc.preciousMetals : 0) +
+          (Number.isFinite(acc.cash) ? acc.cash : 0),
         0
       )
       : 0
@@ -781,14 +785,16 @@ export const createStocksSlice: StateCreator<ZakatState, [], [], any> = (set, ge
     // Get dividend total (fully zakatable)
     const dividendTotal = state.stockValues?.total_dividend_earnings || 0
 
-    // Get per-account zakatable amounts: active=100%, passive=30%, dividends=100%
+    // Get per-account zakatable amounts: active=100%, passive=30%, dividends=100%, preciousMetals=100%, cash=100%
     const accountsZakatable = Array.isArray(state.stockValues?.stockAccounts)
       ? state.stockValues.stockAccounts.reduce(
         (sum: number, acc: StockAccount) =>
           sum +
           (Number.isFinite(acc.active) ? acc.active : 0) +
           (Number.isFinite(acc.passive) ? acc.passive * PASSIVE_FUND_RATE : 0) +
-          (Number.isFinite(acc.dividends) ? acc.dividends : 0),
+          (Number.isFinite(acc.dividends) ? acc.dividends : 0) +
+          (Number.isFinite(acc.preciousMetals) ? acc.preciousMetals : 0) +
+          (Number.isFinite(acc.cash) ? acc.cash : 0),
         0
       )
       : 0

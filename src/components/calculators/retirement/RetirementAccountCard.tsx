@@ -42,6 +42,10 @@ const ACCOUNT_TYPE_GROUPS: { label: string; types: RetirementAccountType[] }[] =
         types: ['traditional_ira', 'roth_ira', 'sep_ira', 'simple_ira'],
     },
     {
+        label: 'Precious Metals',
+        types: ['precious_metals'],
+    },
+    {
         label: 'Other',
         types: ['pension', 'after_tax', 'other'],
     },
@@ -62,9 +66,42 @@ function fmt(value: number, currency: string) {
 function netZakatable(account: RetirementAccount): number {
     const meta = RETIREMENT_ACCOUNT_META[account.accountType]
     if (meta.isLocked && !account.isAccessible) return 0
-    const bal = account.balance
-    if (!meta.zakatOnNet) return bal
-    return Math.max(0, bal * (1 - account.taxRate / 100 - account.penaltyRate / 100))
+    const metals = account.preciousMetals || 0
+    const cash = account.cash || 0
+
+    let grossZakatable = 0
+    let totalInvestmentValue = 0
+
+    if (account.treatment === 'investment') {
+        const active = account.active || 0
+        const passive = account.passive || 0
+        const dividends = account.dividends || 0
+        grossZakatable = active + (passive * 0.3) + dividends
+        totalInvestmentValue = active + passive + dividends
+    } else {
+        if (account.isTaxDifferentiated) {
+            grossZakatable = (account.principal || 0) + (account.gains || 0)
+        } else {
+            grossZakatable = account.balance || 0
+        }
+    }
+
+    grossZakatable += metals + cash
+
+    let netInvestment = grossZakatable
+    if (meta.zakatOnNet) {
+        if (account.isTaxDifferentiated) {
+            const gains = account.gains || 0
+            const taxFactor = ((account.taxRate || 0) / 100) + ((account.penaltyRate || 0) / 100)
+            const taxOnGains = gains * taxFactor
+            netInvestment -= taxOnGains
+        } else {
+            const taxFactor = ((account.taxRate || 0) / 100) + ((account.penaltyRate || 0) / 100)
+            netInvestment *= (1 - taxFactor)
+        }
+    }
+    
+    return Math.max(0, netInvestment)
 }
 
 // ─── TaxBadge ─────────────────────────────────────────────────────────────────
@@ -106,6 +143,12 @@ export function RetirementAccountCard({ account, currency, onRemove, onUpdate }:
     const [balanceInput, setBalanceInput] = useState(
         account.balance > 0 ? String(account.balance) : ''
     )
+    const [metalsInput, setMetalsInput] = useState(
+        account.preciousMetals > 0 ? String(account.preciousMetals) : ''
+    )
+    const [cashInput, setCashInput] = useState(
+        account.cash > 0 ? String(account.cash) : ''
+    )
 
     const meta = RETIREMENT_ACCOUNT_META[account.accountType]
     const net = netZakatable(account)
@@ -122,10 +165,10 @@ export function RetirementAccountCard({ account, currency, onRemove, onUpdate }:
         })
     }
 
-    function handleBalanceBlur() {
-        const raw = parseFloat(balanceInput.replace(/,/g, ''))
+    function handleInputBlur(field: keyof RetirementAccount, value: string) {
+        const raw = parseFloat(value.replace(/,/g, ''))
         const val = isFinite(raw) && raw >= 0 ? raw : 0
-        onUpdate({ balance: val })
+        onUpdate({ [field]: val })
     }
 
     // Accessible toggle: when user marks as accessible, clear penalty
@@ -135,6 +178,17 @@ export function RetirementAccountCard({ account, currency, onRemove, onUpdate }:
             penaltyRate: checked ? 0 : meta.defaultPenaltyRate,
         })
     }
+
+    function getAccountTotalVal() {
+        let val = 0
+        if (account.treatment === 'investment') {
+            val = (account.active || 0) + (account.passive || 0) + (account.dividends || 0)
+        } else {
+            val = account.isTaxDifferentiated ? (account.principal || 0) + (account.gains || 0) : (account.balance || 0)
+        }
+        return val + (account.preciousMetals || 0) + (account.cash || 0)
+    }
+    const totalValue = getAccountTotalVal()
 
     return (
         <motion.div
@@ -158,7 +212,7 @@ export function RetirementAccountCard({ account, currency, onRemove, onUpdate }:
                     />
                     <div className="flex items-center gap-2 mt-0.5">
                         <TaxBadge treatment={meta.taxTreatment} />
-                        {account.balance > 0 && (
+                        {totalValue > 0 && (
                             <span className="text-xs text-gray-400">
                                 {isLocked ? 'Deferred' : `Net ${fmt(net, currency)}`}
                             </span>
@@ -166,10 +220,10 @@ export function RetirementAccountCard({ account, currency, onRemove, onUpdate }:
                     </div>
                 </div>
 
-                {account.balance > 0 && (
+                {totalValue > 0 && (
                     <div className="text-right hidden sm:block shrink-0">
-                        <p className="text-xs text-gray-400">Balance</p>
-                        <p className="text-sm font-semibold text-gray-900">{fmt(account.balance, currency)}</p>
+                        <p className="text-xs text-gray-400">Total Value</p>
+                        <p className="text-sm font-semibold text-gray-900">{fmt(totalValue, currency)}</p>
                     </div>
                 )}
 
@@ -208,7 +262,7 @@ export function RetirementAccountCard({ account, currency, onRemove, onUpdate }:
                             {/* Account type + balance row */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 {/* Account type */}
-                                <div className="space-y-1.5">
+                                <div className="space-y-1.5 min-w-[200px] flex-1">
                                     <Label className="text-xs font-medium text-gray-700">Account Type</Label>
                                     <Select value={account.accountType} onValueChange={handleTypeChange}>
                                         <SelectTrigger className="text-sm h-10">
@@ -231,17 +285,89 @@ export function RetirementAccountCard({ account, currency, onRemove, onUpdate }:
                                     </Select>
                                 </div>
 
-                                {/* Balance */}
+                                {/* Treatment toggles */}
                                 <div className="space-y-1.5">
-                                    <Label htmlFor={`balance-${account.id}`} className="text-xs font-medium text-gray-700">
-                                        Account Balance
-                                    </Label>
+                                    <Label className="text-xs font-medium text-gray-700">Treatment</Label>
+                                    <div className="flex bg-gray-100 p-1 rounded-lg">
+                                        <button
+                                            onClick={() => onUpdate({ treatment: 'cash' })}
+                                            className={`flex-1 text-sm py-1.5 px-3 rounded-md transition-colors ${account.treatment === 'cash' ? 'bg-white shadow-sm text-gray-900 font-medium' : 'text-gray-500 hover:text-gray-700'}`}
+                                        >
+                                            Cash
+                                        </button>
+                                        <button
+                                            onClick={() => onUpdate({ treatment: 'investment' })}
+                                            className={`flex-1 text-sm py-1.5 px-3 rounded-md transition-colors ${account.treatment === 'investment' ? 'bg-white shadow-sm text-gray-900 font-medium' : 'text-gray-500 hover:text-gray-700'}`}
+                                        >
+                                            Investment
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Investment specific rows */}
+                            {account.treatment === 'investment' && (
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg border border-gray-100">
+                                    <div className="space-y-1.5">
+                                        <Label className="text-xs font-medium text-gray-700">Active (100% Zakat)</Label>
+                                        <div className="relative">
+                                            <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                                                <span className="text-xs font-medium text-gray-500">{currency}</span>
+                                            </div>
+                                            <Input
+                                                type="text"
+                                                inputMode="decimal"
+                                                className="pl-12 text-sm"
+                                                value={account.active || ''}
+                                                onChange={(e) => onUpdate({ active: parseFloat(e.target.value) || 0 })}
+                                                placeholder="0.00"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label className="text-xs font-medium text-gray-700">Passive (30% Zakat)</Label>
+                                        <div className="relative">
+                                            <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                                                <span className="text-xs font-medium text-gray-500">{currency}</span>
+                                            </div>
+                                            <Input
+                                                type="text"
+                                                inputMode="decimal"
+                                                className="pl-12 text-sm"
+                                                value={account.passive || ''}
+                                                onChange={(e) => onUpdate({ passive: parseFloat(e.target.value) || 0 })}
+                                                placeholder="0.00"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label className="text-xs font-medium text-gray-700">Dividends (100%)</Label>
+                                        <div className="relative">
+                                            <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                                                <span className="text-xs font-medium text-gray-500">{currency}</span>
+                                            </div>
+                                            <Input
+                                                type="text"
+                                                inputMode="decimal"
+                                                className="pl-12 text-sm"
+                                                value={account.dividends || ''}
+                                                onChange={(e) => onUpdate({ dividends: parseFloat(e.target.value) || 0 })}
+                                                placeholder="0.00"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Cash or simple balance */}
+                            {account.treatment === 'cash' && !account.isTaxDifferentiated && (
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs font-medium text-gray-700">Account Balance</Label>
                                     <div className="relative">
                                         <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
                                             <span className="text-xs font-medium text-gray-500">{currency}</span>
                                         </div>
                                         <Input
-                                            id={`balance-${account.id}`}
                                             type="text"
                                             inputMode="decimal"
                                             className="pl-12 text-sm"
@@ -250,7 +376,130 @@ export function RetirementAccountCard({ account, currency, onRemove, onUpdate }:
                                                 const v = e.target.value
                                                 if (/^[\d.,]*$/.test(v) || v === '') setBalanceInput(v)
                                             }}
-                                            onBlur={handleBalanceBlur}
+                                            onBlur={() => handleInputBlur('balance', balanceInput)}
+                                            placeholder="0.00"
+                                        />
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Tax Differentiated Toggle & Inputs */}
+                            {account.treatment === 'cash' && (meta.taxTreatment === 'roth' || meta.taxTreatment === 'after_tax') && (
+                                <div className="border border-indigo-100 rounded-lg overflow-hidden bg-white">
+                                    <div className="flex items-center justify-between p-3 bg-indigo-50/50">
+                                        <div className="flex flex-col">
+                                            <span className="text-sm font-medium text-gray-800">Tax Differentiate Balance?</span>
+                                            <span className="text-xs text-gray-500">Split into Principal (Contributions) vs Gains to accurately apply taxes. Useful for Roth.</span>
+                                        </div>
+                                        <Switch
+                                            checked={account.isTaxDifferentiated}
+                                            onCheckedChange={(checked) => onUpdate({ isTaxDifferentiated: checked })}
+                                        />
+                                    </div>
+
+                                    <AnimatePresence initial={false}>
+                                        {account.isTaxDifferentiated && (
+                                            <motion.div
+                                                initial={{ height: 0, opacity: 0 }}
+                                                animate={{ height: 'auto', opacity: 1 }}
+                                                exit={{ height: 0, opacity: 0 }}
+                                                transition={{ duration: 0.22, ease: [0.2, 0.4, 0.2, 1] }}
+                                            >
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-indigo-50 border-t border-indigo-100">
+                                                    <div className="space-y-1.5">
+                                                        <Label className="text-xs font-medium text-indigo-900">Principal (Contributions)</Label>
+                                                        <div className="relative">
+                                                            <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                                                                <span className="text-xs font-medium text-indigo-500">{currency}</span>
+                                                            </div>
+                                                            <Input
+                                                                type="text"
+                                                                inputMode="decimal"
+                                                                className="pl-12 text-sm border-indigo-200 bg-white"
+                                                                value={account.principal || ''}
+                                                                onChange={(e) => onUpdate({ principal: parseFloat(e.target.value) || 0 })}
+                                                                placeholder="0.00"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                    <div className="space-y-1.5">
+                                                        <Label className="text-xs font-medium text-indigo-900">Gains (Earnings)</Label>
+                                                        <div className="relative">
+                                                            <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                                                                <span className="text-xs font-medium text-indigo-500">{currency}</span>
+                                                            </div>
+                                                            <Input
+                                                                type="text"
+                                                                inputMode="decimal"
+                                                                className="pl-12 text-sm border-indigo-200 bg-white"
+                                                                value={account.gains || ''}
+                                                                onChange={(e) => onUpdate({ gains: parseFloat(e.target.value) || 0 })}
+                                                                placeholder="0.00"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+                                </div>
+                            )}
+
+
+
+                            {/* Second row: Precious Metals + Cash */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                {/* Precious Metals */}
+                                <div className="space-y-1.5">
+                                    <div className="flex items-center gap-1.5">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                                        <Label htmlFor={`metals-${account.id}`} className="text-xs font-medium text-gray-700">
+                                            Precious Metals (100%)
+                                        </Label>
+                                    </div>
+                                    <div className="relative">
+                                        <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                                            <span className="text-xs font-medium text-gray-500">{currency}</span>
+                                        </div>
+                                        <Input
+                                            id={`metals-${account.id}`}
+                                            type="text"
+                                            inputMode="decimal"
+                                            className="pl-12 text-sm border-amber-100 focus:border-amber-300 focus:ring-amber-100"
+                                            value={metalsInput}
+                                            onChange={(e) => {
+                                                const v = e.target.value
+                                                if (/^[\d.,]*$/.test(v) || v === '') setMetalsInput(v)
+                                            }}
+                                            onBlur={() => handleInputBlur('preciousMetals', metalsInput)}
+                                            placeholder="0.00"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Cash */}
+                                <div className="space-y-1.5">
+                                    <div className="flex items-center gap-1.5">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-teal-500" />
+                                        <Label htmlFor={`cash-${account.id}`} className="text-xs font-medium text-gray-700">
+                                            Cash Holdings (100%)
+                                        </Label>
+                                    </div>
+                                    <div className="relative">
+                                        <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                                            <span className="text-xs font-medium text-gray-500">{currency}</span>
+                                        </div>
+                                        <Input
+                                            id={`cash-${account.id}`}
+                                            type="text"
+                                            inputMode="decimal"
+                                            className="pl-12 text-sm border-teal-100 focus:border-teal-300 focus:ring-teal-100"
+                                            value={cashInput}
+                                            onChange={(e) => {
+                                                const v = e.target.value
+                                                if (/^[\d.,]*$/.test(v) || v === '') setCashInput(v)
+                                            }}
+                                            onBlur={() => handleInputBlur('cash', cashInput)}
                                             placeholder="0.00"
                                         />
                                     </div>
@@ -376,16 +625,32 @@ export function RetirementAccountCard({ account, currency, onRemove, onUpdate }:
                             )}
 
                             {/* Per-account mini summary */}
-                            {account.balance > 0 && (
+                            {(account.balance > 0 || account.preciousMetals > 0 || account.cash > 0) && (
                                 <motion.div
                                     initial={{ opacity: 0, y: 4 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     className="flex flex-wrap gap-x-4 gap-y-1 pt-1 text-xs text-gray-500 border-t border-gray-100"
                                 >
                                     <span>
-                                        Balance:{' '}
-                                        <span className="font-medium text-gray-800">{fmt(account.balance, currency)}</span>
+                                        Total:{' '}
+                                        <span className="font-medium text-gray-800">{fmt(totalValue, currency)}</span>
                                     </span>
+                                    {account.preciousMetals > 0 && (
+                                        <>
+                                            <span>·</span>
+                                            <span>
+                                                Metals: <span className="font-medium text-gray-800">{fmt(account.preciousMetals, currency)}</span>
+                                            </span>
+                                        </>
+                                    )}
+                                    {account.cash > 0 && (
+                                        <>
+                                            <span>·</span>
+                                            <span>
+                                                Cash: <span className="font-medium text-gray-800">{fmt(account.cash, currency)}</span>
+                                            </span>
+                                        </>
+                                    )}
                                     <span>·</span>
                                     {isLocked ? (
                                         <span className="text-amber-600 font-medium">

@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useState, useEffect, useMemo } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/form/input'
 import { Label } from '@/components/ui/label'
@@ -16,7 +17,7 @@ import { FAQ } from '@/components/ui/faq'
 import { ASSET_FAQS } from '@/config/faqs'
 import { useCurrencyStore } from '@/lib/services/currency'
 import { DeleteIcon } from '@/components/ui/icons/icon-delete'
-import { PlusIcon } from 'lucide-react'
+import { Plus, PlusIcon } from 'lucide-react'
 import { CurrencySelector } from '@/components/CurrencySelector'
 import { ForeignCurrencyEntry } from '@/store/types'
 import { CalculatorNav } from '@/components/ui/calculator-nav'
@@ -24,6 +25,7 @@ import { useForeignCurrency } from '@/hooks/useForeignCurrency'
 import { CashValues as StoreCashValues } from '@/store/types'
 import { useStoreHydration } from '@/hooks/useStoreHydration'
 import { useCalculatorReset } from '@/hooks/useCalculatorReset'
+import { BankAccountCard } from './BankAccountCard'
 import {
   CashCalculatorProps,
   ForeignCurrencyInputProps,
@@ -422,7 +424,10 @@ export function CashCalculator({
     cashHawlMet,
     setCashHawlMet,
     getTotalCash,
-    getTotalZakatableCash
+    getTotalZakatableCash,
+    addBankAccount,
+    removeBankAccount,
+    updateBankAccount,
   } = useZakatStore()
 
   // Track both display values and raw input values
@@ -620,16 +625,98 @@ export function CashCalculator({
     setCashHawlMet(value);
   }, [setCashHawlMet]);
 
+  const bankAccounts = cashValues.bank_accounts || []
+  const bankTotal = bankAccounts.reduce((s, a) => s + a.balance, 0)
+  const bankZakatDue = cashHawlMet ? bankTotal * 0.025 : 0
+
+  const fmtBankCurrency = (v: number) =>
+    v === 0 ? '—' : v.toLocaleString(undefined, { style: 'currency', currency, minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
   return (
     <TooltipProvider>
       <div className="space-y-8 w-full">
         {/* Main Content */}
         <div className="space-y-10 w-full">
+
+          {/* Bank Accounts Section */}
+          <section className="w-full space-y-5">
+            <div>
+              <h3 className="text-base font-semibold text-gray-900">Bank Accounts</h3>
+              <p className="text-sm text-gray-500 mt-0.5">Add each bank account separately with its name and current balance.</p>
+            </div>
+
+            <AnimatePresence mode="popLayout">
+              {bankAccounts.length === 0 && (
+                <motion.div
+                  key="empty"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="rounded-xl border border-dashed border-gray-200 py-10 text-center text-sm text-gray-400"
+                >
+                  No bank accounts yet — add one below.
+                </motion.div>
+              )}
+
+              {bankAccounts.map((account) => (
+                <BankAccountCard
+                  key={account.id}
+                  account={account}
+                  currency={currency}
+                  hawlMet={cashHawlMet}
+                  onRemove={() => removeBankAccount(account.id)}
+                  onUpdate={(updates) => updateBankAccount(account.id, updates)}
+                />
+              ))}
+            </AnimatePresence>
+
+            <Button
+              variant="outline"
+              className="w-full gap-2 border-dashed"
+              onClick={addBankAccount}
+            >
+              <Plus className="h-4 w-4" />
+              Add Bank Account
+            </Button>
+
+            {/* Grand total for bank accounts */}
+            <AnimatePresence>
+              {bankTotal > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  className="rounded-xl border border-violet-100 bg-violet-50/60 px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-1.5 h-8 rounded-full bg-violet-400/70 shrink-0" />
+                    <div>
+                      <p className="text-[11px] font-medium text-violet-500 uppercase tracking-wide">Total across all accounts</p>
+                      <p className="text-xl font-semibold text-gray-900">{fmtBankCurrency(bankTotal)}</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-5 pl-5 sm:pl-0 text-sm border-t border-violet-100 sm:border-t-0 pt-3 sm:pt-0">
+                    <div>
+                      <p className="text-xs text-gray-400">Zakatable</p>
+                      <p className="font-medium text-gray-700">{cashHawlMet ? fmtBankCurrency(bankTotal) : '—'}</p>
+                    </div>
+                    {cashHawlMet && (
+                      <div>
+                        <p className="text-xs text-gray-400">Zakat due (2.5%)</p>
+                        <p className="font-semibold text-emerald-600">{fmtBankCurrency(bankZakatDue)}</p>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </section>
+
           {/* Cash Categories */}
           <section className="w-full">
             <FAQ
-              title="Cash Holdings"
-              description="Enter all your cash and cash-equivalent holdings. Include any money that's easily accessible."
+              title="Other Cash Holdings"
+              description="Enter any additional cash and cash-equivalent holdings not covered by bank accounts above."
               items={ASSET_FAQS.cash}
               defaultOpen={false}
             />

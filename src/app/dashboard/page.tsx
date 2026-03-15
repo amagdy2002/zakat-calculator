@@ -144,12 +144,11 @@ export default function DashboardPage() {
 
   // CSV export functionality
   const handleExportCSV = () => {
+    console.log("Export CSV function triggered");
     try {
       const zakatStore = useZakatStore.getState();
 
-      // Get all the values needed
       const breakdown = zakatStore.getBreakdown();
-
       const stockBreakdown = zakatStore.getStocksBreakdown();
       const metalsBreakdown = zakatStore.getMetalsBreakdown();
       const realEstateBreakdown = zakatStore.getRealEstateBreakdown();
@@ -158,45 +157,52 @@ export default function DashboardPage() {
       const retirementBreakdown = zakatStore.getRetirementBreakdown();
       const debtBreakdown = zakatStore.getDebtBreakdown();
 
-      // Create CSV header row with consistent formatting
-      let csvContent = "Asset Type,Subcategory,Value,Zakatable Value,Zakat Due,Hawl Status,Currency\n";
+      // Requested columns: Account Name, Type, Zakatable Percent, Value
+      let csvContent = "Account Name,Type,Zakatable Percent,Value\n";
 
-      // Function to ensure consistent empty line after each asset section
-      const addEmptyLine = () => {
-        if (!csvContent.endsWith("\n\n")) {
-          csvContent += "\n";
-        }
+      // Function to add multiple empty rows between sections
+      const addSectionGap = () => {
+        csvContent += "\n\n\n"; // A few rows between every section
       };
 
       // Helper function to add an asset type to the CSV
       const addAssetToCSV = (
         assetType: string,
-        breakdown: { items?: Record<string, { value: number; zakatable?: number; zakatDue?: number; label?: string }> },
-        hawlMet: boolean
+        breakdown: { items?: Record<string, { value: number; zakatable?: number; zakatDue?: number; label?: string }> }
       ) => {
         if (!breakdown || !breakdown.items) return;
+        
+        const items = Object.entries(breakdown.items);
+        if (items.length === 0) return;
 
-        const hawlStatus = hawlMet ? "Met" : "Not Met";
-
-        Object.entries(breakdown.items).forEach(([itemKey, itemData]) => {
+        items.forEach(([itemKey, itemData]) => {
           if (!itemData || typeof itemData.value !== 'number') return;
 
           const value = itemData.value;
           const zakatable = typeof itemData.zakatable === 'number' ? itemData.zakatable : 0;
-          const zakatDue = typeof itemData.zakatDue === 'number' ? itemData.zakatDue : 0;
           const label = itemData.label || itemKey;
+          
+          let zakatablePercent = 0;
+          if (value > 0) {
+            zakatablePercent = (zakatable / value) * 100;
+          }
 
-          csvContent += `${assetType},${label},${value.toFixed(2)},${zakatable.toFixed(2)},${zakatDue.toFixed(2)},${hawlStatus},${state.currency}\n`;
+          // Format names to avoid CSV issues with commas safely
+          const safeLabel = String(label || itemKey);
+          const safeType = String(assetType);
+          const formattedLabel = safeLabel.includes(',') ? `"${safeLabel}"` : safeLabel;
+          const formattedType = safeType.includes(',') ? `"${safeType}"` : safeType;
+
+          csvContent += `${formattedLabel},${formattedType},${zakatablePercent.toFixed(2)}%,${value.toFixed(2)}\n`;
         });
 
-        addEmptyLine();
+        addSectionGap();
       };
 
       // Add all asset types
-      if (cashBreakdown) addAssetToCSV("Cash & Bank", cashBreakdown, zakatStore.cashHawlMet);
-      if (metalsBreakdown && metalsBreakdown.items) {
-        const hawlStatus = zakatStore.metalsHawlMet ? "Met" : "Not Met";
-
+      if (cashBreakdown) addAssetToCSV("Cash & Bank", cashBreakdown);
+      
+      if (metalsBreakdown && metalsBreakdown.items && Object.keys(metalsBreakdown.items).length > 0) {
         const metalNameMap: Record<string, string> = {
           "gold_regular": "Gold (Regular Use)",
           "gold_occasional": "Gold (Occasional Use)",
@@ -205,33 +211,43 @@ export default function DashboardPage() {
           "silver_occasional": "Silver (Occasional Use)",
           "silver_investment": "Silver Investment"
         };
-
+        
+        let hasMetals = false;
         Object.entries(metalsBreakdown.items).forEach(([itemKey, itemData]) => {
           if (!itemData || typeof itemData.value !== 'number') return;
+          hasMetals = true;
 
           const value = itemData.value;
           const zakatable = typeof itemData.zakatable === 'number' ? itemData.zakatable : 0;
-          const zakatDue = typeof itemData.zakatDue === 'number' ? itemData.zakatDue : 0;
           const label = metalNameMap[itemKey] || itemKey;
+          
+          let zakatablePercent = 0;
+          if (value > 0) {
+            zakatablePercent = (zakatable / value) * 100;
+          }
 
-          csvContent += `Precious Metals,${label},${value.toFixed(2)},${zakatable.toFixed(2)},${zakatDue.toFixed(2)},${hawlStatus},${state.currency}\n`;
+          const safeLabel = String(label || itemKey);
+          const formattedLabel = safeLabel.includes(',') ? `"${safeLabel}"` : safeLabel;
+          csvContent += `${formattedLabel},Precious Metals,${zakatablePercent.toFixed(2)}%,${value.toFixed(2)}\n`;
         });
 
-        addEmptyLine();
-      }
-      if (stockBreakdown) addAssetToCSV("Stocks & Investments", stockBreakdown, zakatStore.stockHawlMet);
-      if (retirementBreakdown) addAssetToCSV("Retirement Accounts", retirementBreakdown, zakatStore.retirementHawlMet);
-      if (realEstateBreakdown) addAssetToCSV("Real Estate", realEstateBreakdown, zakatStore.realEstateHawlMet);
-      if (cryptoBreakdown) addAssetToCSV("Cryptocurrency", cryptoBreakdown, zakatStore.cryptoHawlMet);
-      if (debtBreakdown) addAssetToCSV("Debt & Liabilities", debtBreakdown, zakatStore.debtHawlMet);
-
-      // Ensure consistent spacing before summary section
-      if (!csvContent.endsWith("\n\n")) {
-        csvContent += "\n";
+        if (hasMetals) {
+          addSectionGap();
+        }
       }
 
-      // Add summary row
-      csvContent += `Summary,Total,${breakdown.combined.totalValue.toFixed(2)},${breakdown.combined.zakatableValue.toFixed(2)},${breakdown.combined.zakatDue.toFixed(2)},,${state.currency}\n`;
+      if (stockBreakdown) addAssetToCSV("Stocks & Investments", stockBreakdown);
+      if (retirementBreakdown) addAssetToCSV("Retirement Accounts", retirementBreakdown);
+      if (realEstateBreakdown) addAssetToCSV("Real Estate", realEstateBreakdown);
+      if (cryptoBreakdown) addAssetToCSV("Cryptocurrency", cryptoBreakdown);
+      if (debtBreakdown) addAssetToCSV("Debt & Liabilities", debtBreakdown);
+
+      // Add summary row at the end
+      let overallPercent = 0;
+      if (breakdown.combined.totalValue > 0) {
+        overallPercent = (breakdown.combined.zakatableValue / breakdown.combined.totalValue) * 100;
+      }
+      csvContent += `Total Summary,All Assets,${overallPercent.toFixed(2)}%,${breakdown.combined.totalValue.toFixed(2)}\n`;
 
       // Get formatted date for filename
       const date = new Date();
@@ -257,6 +273,7 @@ export default function DashboardPage() {
       });
     } catch (error) {
       console.error('Error exporting CSV:', error);
+      alert('Error exporting CSV: ' + (error instanceof Error ? error.message : String(error)));
     }
   };
 

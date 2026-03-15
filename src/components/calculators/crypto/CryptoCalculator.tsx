@@ -48,6 +48,7 @@ export function CryptoCalculator({
 
   const [newSymbol, setNewSymbol] = useState('')
   const [newQuantity, setNewQuantity] = useState('')
+  const [inputMode, setInputMode] = useState<'quantity' | 'value'>('quantity')
   const [error, setError] = useState<string | null>(null)
 
   // Post-hydration initialization
@@ -90,7 +91,7 @@ export function CryptoCalculator({
     if (!newSymbol || !newQuantity) return
 
     try {
-      await addCoin(newSymbol, Number(newQuantity), currency)
+      await addCoin(newSymbol, Number(newQuantity), currency, inputMode)
 
       // Clear form
       setNewSymbol('')
@@ -225,7 +226,35 @@ export function CryptoCalculator({
       />
 
       {/* Add New Coin Form */}
-      <form onSubmit={handleAddCoin} className="space-y-5">
+      <form onSubmit={handleAddCoin} className="space-y-4">
+        {/* Input mode toggle */}
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => { setInputMode('quantity'); setNewQuantity('') }}
+            className={cn(
+              "flex-1 py-1.5 text-xs font-medium rounded-md border transition-colors",
+              inputMode === 'quantity'
+                ? "bg-gray-900 text-white border-gray-900"
+                : "bg-white text-gray-500 border-gray-200 hover:border-gray-400"
+            )}
+          >
+            Quantity (coins)
+          </button>
+          <button
+            type="button"
+            onClick={() => { setInputMode('value'); setNewQuantity('') }}
+            className={cn(
+              "flex-1 py-1.5 text-xs font-medium rounded-md border transition-colors",
+              inputMode === 'value'
+                ? "bg-gray-900 text-white border-gray-900"
+                : "bg-white text-gray-500 border-gray-200 hover:border-gray-400"
+            )}
+          >
+            Monetary Value
+          </button>
+        </div>
+
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="symbol">Coin/Token Symbol</Label>
@@ -237,7 +266,9 @@ export function CryptoCalculator({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="quantity">Quantity</Label>
+            <Label htmlFor="quantity">
+              {inputMode === 'quantity' ? 'Quantity' : `Value (${currency})`}
+            </Label>
             <Input
               id="quantity"
               type="number"
@@ -245,7 +276,7 @@ export function CryptoCalculator({
               min="0"
               value={newQuantity}
               onChange={e => setNewQuantity(e.target.value)}
-              placeholder="Enter amount"
+              placeholder={inputMode === 'quantity' ? 'No. of coins' : 'Monetary value'}
             />
           </div>
         </div>
@@ -336,12 +367,20 @@ export function CryptoCalculator({
                       <p className="font-mono text-xs font-medium text-white">{coin.symbol}</p>
                     </div>
                     <p className="text-xs text-gray-500">
-                      {coin.quantity.toLocaleString()} × {new Intl.NumberFormat(undefined, {
-                        style: 'currency',
-                        currency: coin.currency || currency,
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2
-                      }).format(coin.currentPrice)}
+                      {coin.inputMode === 'value'
+                        ? `${new Intl.NumberFormat(undefined, {
+                            style: 'currency',
+                            currency: coin.currency || currency,
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2
+                          }).format(coin.inputValue ?? coin.marketValue)} entered · ${coin.quantity.toLocaleString(undefined, { maximumFractionDigits: 6 })} coins`
+                        : `${coin.quantity.toLocaleString()} × ${new Intl.NumberFormat(undefined, {
+                            style: 'currency',
+                            currency: coin.currency || currency,
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2
+                          }).format(coin.currentPrice)}`
+                      }
                     </p>
                   </div>
                   <div className="flex items-center gap-3">

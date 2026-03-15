@@ -12,7 +12,7 @@ import { DistributionSlice } from './modules/distribution'
 import { DebtSlice } from './modules/debt.types'
 
 // Re-export canonical metal types from metals module
-export type { MetalPrices, MetalsPreferences, GoldPurity } from './modules/metals.types'
+export type { MetalPrices, MetalsPreferences, GoldPurity, MetalInputMode } from './modules/metals.types'
 
 // Re-export types with new names to avoid conflicts
 export type AssetBreakdown = LibAssetBreakdown
@@ -41,14 +41,15 @@ export interface NisabData {
   };
 }
 
-// Exported for tests and validation
+// Exported for tests and validation (investment metals only)
 export interface MetalValues extends Record<string, unknown> {
-  gold_regular: number
-  gold_occasional: number
   gold_investment: number
-  silver_regular: number
-  silver_occasional: number
+  gold_investment_purity: import('./modules/metals.types').GoldPurity
+  gold_investment_input_mode: import('./modules/metals.types').MetalInputMode
+  gold_investment_value: number
   silver_investment: number
+  silver_investment_input_mode: import('./modules/metals.types').MetalInputMode
+  silver_investment_value: number
 }
 
 // Keep old name for backward compatibility
@@ -110,6 +111,12 @@ export interface ForeignCurrencyEntry {
   rawInput?: string
 }
 
+export interface BankAccount {
+  id: string
+  name: string
+  balance: number
+}
+
 export interface CashValues extends Record<string, unknown> {
   cash_on_hand: number
   checking_account: number
@@ -117,6 +124,7 @@ export interface CashValues extends Record<string, unknown> {
   digital_wallets: number
   foreign_currency: number
   foreign_currency_entries?: ForeignCurrencyEntry[]
+  bank_accounts?: BankAccount[]
 }
 
 // Debt Types

@@ -8,6 +8,10 @@ export interface CryptoHolding {
   zakatDue: number
   currency?: string
   isFallback?: boolean
+  /** How the user entered this holding */
+  inputMode?: 'quantity' | 'value'
+  /** The raw value the user typed (coins or currency amount) */
+  inputValue?: number
 }
 
 export interface CryptoValues extends Record<string, unknown> {
@@ -24,7 +28,7 @@ export interface CryptoSlice {
   lastError: string | null
 
   // Actions
-  addCoin: (symbol: string, quantity: number, currency?: string) => Promise<void>
+  addCoin: (symbol: string, amount: number, currency?: string, inputMode?: 'quantity' | 'value') => Promise<void>
   removeCoin: (symbol: string) => void
   resetCryptoValues: () => void
   setCryptoHawl: (value: boolean) => void
