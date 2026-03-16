@@ -201,26 +201,31 @@ export function RetirementCalculator({
       <AnimatePresence>
         {totalBalance > 0 && (
           <motion.div
-            initial={{ opacity: 0, y: 6 }}
+            initial={{ opacity: 0, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            className="rounded-xl bg-gray-900 text-white px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+            className="rounded-xl border border-violet-100 bg-violet-50/60 px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
           >
-            <div className="space-y-0.5">
-              <p className="text-xs text-gray-400 uppercase tracking-wide">All Accounts</p>
-              <p className="text-lg font-semibold">{formatCurrency(totalBalance)}</p>
-              {hasLocked && (
-                <p className="text-xs text-amber-400">* Some accounts are deferred</p>
-              )}
+            <div className="flex items-center gap-3">
+              <div className="w-1.5 h-8 rounded-full bg-violet-400/70 shrink-0" />
+              <div>
+                <p className="text-[11px] font-medium text-violet-500 uppercase tracking-wide">Total across all accounts</p>
+                <div className="flex items-baseline gap-2">
+                  <p className="text-xl font-semibold text-gray-900">{formatCurrency(totalBalance)}</p>
+                  {hasLocked && (
+                    <p className="text-[10px] text-amber-600 font-medium">* Deferred</p>
+                  )}
+                </div>
+              </div>
             </div>
-            <div className="flex gap-6 text-sm">
+            <div className="flex gap-5 pl-5 sm:pl-0 text-sm border-t border-violet-100 sm:border-t-0 pt-3 sm:pt-0">
               <div>
                 <p className="text-xs text-gray-400">Net Zakatable</p>
-                <p className="font-medium">{formatCurrency(totalZakatable)}</p>
+                <p className="font-medium text-gray-700">{formatCurrency(totalZakatable)}</p>
               </div>
               <div>
                 <p className="text-xs text-gray-400">Zakat due (2.5%)</p>
-                <p className="font-semibold text-emerald-400">{formatCurrency(totalZakatDue)}</p>
+                <p className="font-semibold text-emerald-600">{formatCurrency(totalZakatDue)}</p>
               </div>
             </div>
           </motion.div>

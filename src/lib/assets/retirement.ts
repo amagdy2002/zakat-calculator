@@ -188,16 +188,110 @@ export const retirement: AssetType = {
     // Create breakdown with detailed information
     const items: Record<string, AssetBreakdownItem> = {}
 
-    // Add per-account accounts breakdown if any exist
-    if (accountsTotal > 0 || (Array.isArray(values.retirementAccounts) && values.retirementAccounts.length > 0)) {
-      items.retirement_accounts = {
-        value: accountsTotal,
-        isZakatable: hawlMet,
-        zakatable: accountsZakatable,
-        zakatDue: accountsZakatable * ZAKAT_RATE,
-        label: 'Retirement Profile',
-        tooltip: 'Includes net balance + 100% of cash & precious metals'
-      }
+    // Add per-account breakdown if any exist
+    if (Array.isArray(values.retirementAccounts)) {
+      values.retirementAccounts.forEach((acc, index) => {
+        const accTotal = getAccountTotal(acc);
+        const accZakatable = getAccountZakatable(acc);
+        
+        if (accTotal > 0) {
+          const typeMeta = RETIREMENT_ACCOUNT_META[acc.accountType];
+          items[`account_${acc.id || index}`] = {
+            value: accTotal,
+            isZakatable: hawlMet,
+            zakatable: hawlMet ? accZakatable : 0,
+            zakatDue: hawlMet ? accZakatable * ZAKAT_RATE : 0,
+            label: acc.name || typeMeta.label,
+            tooltip: `Includes net balance + 100% of cash & precious metals. Type: ${typeMeta.label}`
+          };
+          
+          // Also add rows for active, passive, dividends if applicable per the user request
+          if (acc.treatment === 'investment') {
+            if (acc.active > 0) {
+              items[`account_${acc.id || index}_active`] = {
+                value: acc.active,
+                isZakatable: hawlMet,
+                zakatable: hawlMet ? acc.active : 0,
+                zakatDue: hawlMet ? acc.active * ZAKAT_RATE : 0,
+                label: `  ↳ ${acc.name || typeMeta.label} - Active Trading`,
+                tooltip: '100% of Active Trading is zakatable'
+              };
+            }
+            if (acc.passive > 0) {
+              items[`account_${acc.id || index}_passive`] = {
+                value: acc.passive,
+                isZakatable: hawlMet,
+                zakatable: hawlMet ? acc.passive * 0.3 : 0,
+                zakatDue: hawlMet ? (acc.passive * 0.3) * ZAKAT_RATE : 0,
+                label: `  ↳ ${acc.name || typeMeta.label} - Passive Investments`,
+                tooltip: '30% of Passive Investments are zakatable'
+              };
+            }
+            if (acc.dividends > 0) {
+              items[`account_${acc.id || index}_dividends`] = {
+                value: acc.dividends,
+                isZakatable: hawlMet,
+                zakatable: hawlMet ? acc.dividends : 0,
+                zakatDue: hawlMet ? acc.dividends * ZAKAT_RATE : 0,
+                label: `  ↳ ${acc.name || typeMeta.label} - Dividends`,
+                tooltip: '100% of Dividends are zakatable'
+              };
+            }
+          } else {
+             if (acc.isTaxDifferentiated) {
+                if (acc.principal > 0) {
+                   items[`account_${acc.id || index}_principal`] = {
+                    value: acc.principal,
+                    isZakatable: hawlMet,
+                    zakatable: hawlMet ? (acc.principal * (typeMeta.zakatOnNet ? (1 - ((acc.taxRate + acc.penaltyRate) / 100)) : 1)) : 0,
+                    zakatDue: hawlMet ? (acc.principal * (typeMeta.zakatOnNet ? (1 - ((acc.taxRate + acc.penaltyRate) / 100)) : 1)) * ZAKAT_RATE : 0,
+                    label: `  ↳ ${acc.name || typeMeta.label} - Principal`,
+                    tooltip: 'Principal contribution value'
+                  };
+                }
+                if (acc.gains > 0) {
+                  items[`account_${acc.id || index}_gains`] = {
+                    value: acc.gains,
+                    isZakatable: hawlMet,
+                    zakatable: hawlMet ? (acc.gains * (typeMeta.zakatOnNet ? (1 - ((acc.taxRate + acc.penaltyRate) / 100)) : 1)) : 0,
+                    zakatDue: hawlMet ? (acc.gains * (typeMeta.zakatOnNet ? (1 - ((acc.taxRate + acc.penaltyRate) / 100)) : 1)) * ZAKAT_RATE : 0,
+                    label: `  ↳ ${acc.name || typeMeta.label} - Gains`,
+                    tooltip: 'Gains on contribution'
+                  };
+                }
+             } else if (acc.balance > 0) {
+                items[`account_${acc.id || index}_balance`] = {
+                  value: acc.balance,
+                  isZakatable: hawlMet,
+                  zakatable: hawlMet ? (acc.balance * (typeMeta.zakatOnNet ? (1 - ((acc.taxRate + acc.penaltyRate) / 100)) : 1)) : 0,
+                  zakatDue: hawlMet ? (acc.balance * (typeMeta.zakatOnNet ? (1 - ((acc.taxRate + acc.penaltyRate) / 100)) : 1)) * ZAKAT_RATE : 0,
+                  label: `  ↳ ${acc.name || typeMeta.label} - Balance`,
+                  tooltip: 'Account balance before cash and metals'
+                };
+             }
+          }
+          if (acc.cash > 0) {
+             items[`account_${acc.id || index}_cash`] = {
+                value: acc.cash,
+                isZakatable: hawlMet,
+                zakatable: hawlMet ? acc.cash : 0,
+                zakatDue: hawlMet ? acc.cash * ZAKAT_RATE : 0,
+                label: `  ↳ ${acc.name || typeMeta.label} - Cash`,
+                tooltip: 'Cash holdings'
+              };
+          }
+          if (acc.preciousMetals > 0) {
+             items[`account_${acc.id || index}_metals`] = {
+                value: acc.preciousMetals,
+                isZakatable: hawlMet,
+                zakatable: hawlMet ? acc.preciousMetals : 0,
+                zakatDue: hawlMet ? acc.preciousMetals * ZAKAT_RATE : 0,
+                label: `  ↳ ${acc.name || typeMeta.label} - Precious Metals`,
+                tooltip: 'Precious metals holdings'
+              };
+          }
+        }
+      });
     }
 
     // Always add traditional accounts, even if zero

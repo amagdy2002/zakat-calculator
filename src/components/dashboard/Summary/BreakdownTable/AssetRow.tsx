@@ -88,6 +88,10 @@ export function AssetRow({
     }
   }
 
+  if (total === 0 && !hasDetails) {
+    return null;
+  }
+
   return (
     <div>
       <div

@@ -108,8 +108,9 @@ export function CryptoCalculator({
   }
 
   // Handle removing a coin
-  const handleRemoveCoin = (symbol: string) => {
-    removeCoin(symbol)
+  const handleRemoveCoin = (id: string) => {
+    if (!id) return;
+    removeCoin(id)
 
     // Update parent with new totals
     onUpdateValues({
@@ -351,7 +352,7 @@ export function CryptoCalculator({
             >
               {cryptoValues.coins.map((coin: CryptoHolding, index: number) => (
                 <motion.div
-                  key={`${coin.symbol}-${index}`}
+                  key={coin.id || `${coin.symbol}-${index}`}
                   variants={{
                     hidden: { opacity: 0, y: 15 },
                     visible: { opacity: 1, y: 0 }
@@ -388,7 +389,7 @@ export function CryptoCalculator({
                       {formatCurrency(coin.marketValue)}
                     </p>
                     <button
-                      onClick={() => handleRemoveCoin(coin.symbol)}
+                      onClick={() => handleRemoveCoin(coin.id || coin.symbol)}
                       className="text-gray-400 hover:text-red-500 transition-colors text-xs"
                     >
                       ×

@@ -137,11 +137,10 @@ export function PersonalJewelryForm({
     <div className="space-y-6">
       <div className="space-y-8">
 
-        {/* ── Personal Jewelry Section ─────────────────────── */}
         <div>
           <FAQ
-            title="Personal Jewelry"
-            description={`Enter the weight of your personal jewelry in ${WEIGHT_UNITS[selectedUnit].label.toLowerCase()}. Include all gold and silver items worn for personal use.`}
+            title="Precious Metals FAQ"
+            description=""
             items={ASSET_FAQS.metals}
             defaultOpen={false}
           />
@@ -155,64 +154,6 @@ export function PersonalJewelryForm({
               <strong>Personal jewelry is not included in your Zakat calculation.</strong> According to the majority of scholars, gold and silver worn regularly for personal use is exempt. Occasionally-worn jewelry is subject to scholarly disagreement — this calculator follows the exemption view. Your totals below reflect investment metals only.
             </p>
           </div>
-
-          {/* Weight Unit Toggle */}
-          <div className="mt-6 mb-6">
-            <div className="relative">
-              <div className="flex rounded-xl bg-gray-50 px-1 py-1.5 relative">
-                <motion.div
-                  className="absolute z-0 top-0 bottom-0 bg-white border border-gray-900 rounded-lg"
-                  initial={false}
-                  animate={{ width: indicatorStyle.width, left: indicatorStyle.left }}
-                  transition={{ type: 'tween', duration: 0.1 }}
-                />
-                {Object.values(WEIGHT_UNITS).map((unit) => (
-                  <button
-                    key={unit.value}
-                    type="button"
-                    onClick={() => handleUnitChange(unit.value)}
-                    className={cn(
-                      'flex-1 flex items-center justify-center px-4 py-1.5 text-sm font-medium rounded-lg relative z-10',
-                      selectedUnit === unit.value ? 'text-gray-900' : 'text-gray-600 hover:text-gray-900'
-                    )}
-                    ref={(el) => { if (el) unitRefs.current[unit.value] = el; return undefined }}
-                  >
-                    <span className="text-sm">
-                      {unit.label}{' '}
-                      <span className="text-sm text-gray-500">({unit.symbol})</span>
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Gold Purity (shared across jewelry + investment) */}
-          <div className="mb-6">
-            <Label className="font-medium mb-2 block">Gold Purity</Label>
-            <div className="grid grid-cols-4 gap-2">
-              {GOLD_PURITY_OPTIONS.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => handleGoldPurityChange(option.value as '24K' | '22K' | '21K' | '18K')}
-                  className={cn(
-                    'flex flex-col items-center justify-center p-3 rounded-lg border',
-                    selectedGoldPurity === option.value
-                      ? 'border-gray-700 bg-gray-50'
-                      : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                  )}
-                >
-                  <span className="text-sm font-medium">{option.value}</span>
-                  <span className="text-xs text-gray-500">
-                    {option.label.match(/\((.+)\)/)?.[1]}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Personal jewelry inputs have been removed per user request */}
         </div>
 
         {/* ── Investment Metals Section ─────────────────────── */}
@@ -242,87 +183,6 @@ export function PersonalJewelryForm({
                     </span>
                   </div>
 
-                  {/* Weight / Value toggle */}
-                  <div className="flex rounded-lg border border-gray-200 overflow-hidden w-fit">
-                    <button
-                      type="button"
-                      onClick={() => handleInputModeChange(category.id, 'weight')}
-                      className={cn(
-                        'px-4 py-1.5 text-sm font-medium transition-colors',
-                        inputMode === 'weight'
-                          ? 'bg-gray-900 text-white'
-                          : 'bg-white text-gray-600 hover:bg-gray-50'
-                      )}
-                    >
-                      By Weight
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleInputModeChange(category.id, 'value')}
-                      className={cn(
-                        'px-4 py-1.5 text-sm font-medium transition-colors border-l border-gray-200',
-                        inputMode === 'value'
-                          ? 'bg-gray-900 text-white'
-                          : 'bg-white text-gray-600 hover:bg-gray-50'
-                      )}
-                    >
-                      By Value
-                    </button>
-                  </div>
-
-                  <AnimatePresence mode="wait">
-                    {inputMode === 'weight' ? (
-                      <motion.div
-                        key="weight"
-                        initial={{ opacity: 0, y: 6 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -6 }}
-                        transition={{ duration: 0.15 }}
-                        className="relative"
-                      >
-                        <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                          <AnimatePresence mode="wait">
-                            <motion.span
-                              key={selectedUnit}
-                              initial={{ opacity: 0, y: 6 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, y: -6 }}
-                              transition={{ duration: 0.12 }}
-                              className="flex h-6 min-w-6 items-center justify-center rounded-md bg-gray-100 px-1.5 text-sm font-medium text-gray-800"
-                            >
-                              {WEIGHT_UNITS[selectedUnit].symbol}
-                            </motion.span>
-                          </AnimatePresence>
-                        </div>
-                        <Input
-                          id={`${category.id}_weight`}
-                          type="text"
-                          inputMode="decimal"
-                          step="any"
-                          min="0"
-                          className={cn(
-                            'pl-12 pr-36 text-sm bg-white border-gray-200 transition-colors duration-300',
-                            lastUnitChange && weightInputs[category.id] ? 'bg-yellow-50' : ''
-                          )}
-                          value={weightInputs[category.id] || ''}
-                          onChange={(e) => handleWeightChange(category.id, e)}
-                          onKeyDown={(e) => handleKeyDown(category.id, e)}
-                          placeholder={`Enter weight in ${WEIGHT_UNITS[selectedUnit].label.toLowerCase()}`}
-                        />
-                        <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none">
-                          {isPricesLoading ? (
-                            <div className="flex items-center gap-2">
-                              <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600" />
-                              <span className="text-sm text-gray-500">Fetching…</span>
-                            </div>
-                          ) : (
-                            <span className="text-sm text-gray-500 whitespace-nowrap">
-                              ≈ {formatCurrency(displayValue)}
-                            </span>
-                          )}
-                        </div>
-                      </motion.div>
-                    ) : (
                       <motion.div
                         key="value"
                         initial={{ opacity: 0, y: 6 }}
@@ -348,14 +208,6 @@ export function PersonalJewelryForm({
                           placeholder={`Enter total value in ${currency}`}
                         />
                       </motion.div>
-                    )}
-                  </AnimatePresence>
-
-                  {category.metal === 'gold' && inputMode === 'weight' && (
-                    <p className="text-xs text-gray-500 ml-1">
-                      Using {selectedGoldPurity} gold purity for calculation
-                    </p>
-                  )}
                 </div>
               )
             })}

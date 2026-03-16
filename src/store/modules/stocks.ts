@@ -889,7 +889,7 @@ export const createStocksSlice: StateCreator<ZakatState, [], [], any> = (set, ge
     }
 
     // Add default item if no stocks at all
-    if (Object.keys(items).length === 0) {
+    if (Object.keys(items).length === 0 && (!Array.isArray(state.stockValues?.stockAccounts) || state.stockValues.stockAccounts.length === 0)) {
       items.stocks = {
         value: 0,
         isZakatable: false,
@@ -899,6 +899,92 @@ export const createStocksSlice: StateCreator<ZakatState, [], [], any> = (set, ge
         tooltip: 'No stocks added yet',
         percentage: 0
       }
+    }
+
+    // Add per-account totals
+    if (Array.isArray(state.stockValues?.stockAccounts)) {
+      const PASSIVE_FUND_RATE = 0.3; // 30% of passive funds are zakatable
+      state.stockValues.stockAccounts.forEach((acc: StockAccount, index: number) => {
+        const accValue = (Number.isFinite(acc.active) ? acc.active : 0) +
+                        (Number.isFinite(acc.passive) ? acc.passive : 0) +
+                        (Number.isFinite(acc.dividends) ? acc.dividends : 0) +
+                        (Number.isFinite(acc.preciousMetals) ? acc.preciousMetals : 0) +
+                        (Number.isFinite(acc.cash) ? acc.cash : 0);
+                        
+        const accZakatable = (Number.isFinite(acc.active) ? acc.active : 0) +
+                            (Number.isFinite(acc.passive) ? acc.passive * PASSIVE_FUND_RATE : 0) +
+                            (Number.isFinite(acc.dividends) ? acc.dividends : 0) +
+                            (Number.isFinite(acc.preciousMetals) ? acc.preciousMetals : 0) +
+                            (Number.isFinite(acc.cash) ? acc.cash : 0);
+        
+        if (accValue > 0) {
+          items[`account_${acc.id || index}`] = {
+            value: accValue,
+            isZakatable: state.stockHawlMet,
+            zakatable: state.stockHawlMet ? accZakatable : 0,
+            zakatDue: state.stockHawlMet ? roundCurrency(accZakatable * ZAKAT_RATE) : 0,
+            label: acc.name || `Investment Account ${index + 1}`,
+            tooltip: 'Combined holdings from investment account',
+            percentage: total > 0 ? roundCurrency((accValue / total) * 100) : 0
+          };
+          
+          if (acc.active > 0) {
+            items[`account_${acc.id || index}_active`] = {
+              value: acc.active,
+              isZakatable: state.stockHawlMet,
+              zakatable: state.stockHawlMet ? acc.active : 0,
+              zakatDue: state.stockHawlMet ? roundCurrency(acc.active * ZAKAT_RATE) : 0,
+              label: `  ↳ ${acc.name || `Account ${index + 1}`} - Active Trading`,
+              tooltip: '100% of Active Trading is zakatable',
+              percentage: total > 0 ? roundCurrency((acc.active / total) * 100) : 0
+            };
+          }
+          if (acc.passive > 0) {
+            items[`account_${acc.id || index}_passive`] = {
+              value: acc.passive,
+              isZakatable: state.stockHawlMet,
+              zakatable: state.stockHawlMet ? acc.passive * PASSIVE_FUND_RATE : 0,
+              zakatDue: state.stockHawlMet ? roundCurrency((acc.passive * PASSIVE_FUND_RATE) * ZAKAT_RATE) : 0,
+              label: `  ↳ ${acc.name || `Account ${index + 1}`} - Passive Investments`,
+              tooltip: '30% of Passive Investments are zakatable',
+              percentage: total > 0 ? roundCurrency((acc.passive / total) * 100) : 0
+            };
+          }
+          if (acc.dividends > 0) {
+            items[`account_${acc.id || index}_dividends`] = {
+              value: acc.dividends,
+              isZakatable: state.stockHawlMet,
+              zakatable: state.stockHawlMet ? acc.dividends : 0,
+              zakatDue: state.stockHawlMet ? roundCurrency(acc.dividends * ZAKAT_RATE) : 0,
+              label: `  ↳ ${acc.name || `Account ${index + 1}`} - Dividends`,
+              tooltip: '100% of Dividends are zakatable',
+              percentage: total > 0 ? roundCurrency((acc.dividends / total) * 100) : 0
+            };
+          }
+          if (acc.preciousMetals > 0) {
+            items[`account_${acc.id || index}_metals`] = {
+              value: acc.preciousMetals,
+              isZakatable: state.stockHawlMet,
+              zakatable: state.stockHawlMet ? acc.preciousMetals : 0,
+              zakatDue: state.stockHawlMet ? roundCurrency(acc.preciousMetals * ZAKAT_RATE) : 0,
+              label: `  ↳ ${acc.name || `Account ${index + 1}`} - Precious Metals`,
+              tooltip: 'Precious metals holdings',
+              percentage: total > 0 ? roundCurrency((acc.preciousMetals / total) * 100) : 0
+            };
+          }
+          if (acc.cash > 0) {
+            items[`account_${acc.id || index}_cash`] = {
+              value: acc.cash,
+              isZakatable: state.stockHawlMet,
+              zakatable: state.stockHawlMet ? acc.cash : 0,
+              zakatDue: state.stockHawlMet ? roundCurrency(acc.cash * ZAKAT_RATE) : 0,
+              label: `  ↳ ${acc.name || `Account ${index + 1}`} - Cash`,
+              tooltip: 'Cash holdings',
+              percentage: total > 0 ? roundCurrency((acc.cash / total) * 100) : 0
+            };
+          }
+        }
+      });
     }
 
     return {

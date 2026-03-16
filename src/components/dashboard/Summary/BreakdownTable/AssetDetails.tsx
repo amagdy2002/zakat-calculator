@@ -37,6 +37,8 @@ export function AssetDetails({ items, currency, hawlMet, isDebtRow }: AssetDetai
           const isLiability = item.isLiability || key.includes('liabilities') || item.label?.includes('Liabilities') || item.label?.includes('Debts')
           const isNegativeValue = item.value < 0
 
+          if (item.value === 0) return null;
+
           return (
           <motion.div
             key={key}

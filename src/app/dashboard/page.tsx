@@ -157,8 +157,8 @@ export default function DashboardPage() {
       const retirementBreakdown = zakatStore.getRetirementBreakdown();
       const debtBreakdown = zakatStore.getDebtBreakdown();
 
-      // Requested columns: Account Name, Type, Zakatable Percent, Value
-      let csvContent = "Account Name,Type,Zakatable Percent,Value\n";
+      // Requested columns: Account Name, Type, Zakatable Percent, Value, Zakat Due
+      let csvContent = "Account Name,Type,Zakatable Percent,Value,Zakat Due\n";
 
       // Function to add multiple empty rows between sections
       const addSectionGap = () => {
@@ -179,6 +179,7 @@ export default function DashboardPage() {
           if (!itemData || typeof itemData.value !== 'number') return;
 
           const value = itemData.value;
+          if (value === 0) return;
           const zakatable = typeof itemData.zakatable === 'number' ? itemData.zakatable : 0;
           const label = itemData.label || itemKey;
           
@@ -193,7 +194,9 @@ export default function DashboardPage() {
           const formattedLabel = safeLabel.includes(',') ? `"${safeLabel}"` : safeLabel;
           const formattedType = safeType.includes(',') ? `"${safeType}"` : safeType;
 
-          csvContent += `${formattedLabel},${formattedType},${zakatablePercent.toFixed(2)}%,${value.toFixed(2)}\n`;
+          const zakatDue = typeof itemData.zakatDue === 'number' ? itemData.zakatDue : 0;
+
+          csvContent += `${formattedLabel},${formattedType},${zakatablePercent.toFixed(2)}%,${value.toFixed(2)},${zakatDue.toFixed(2)}\n`;
         });
 
         addSectionGap();
@@ -215,6 +218,7 @@ export default function DashboardPage() {
         let hasMetals = false;
         Object.entries(metalsBreakdown.items).forEach(([itemKey, itemData]) => {
           if (!itemData || typeof itemData.value !== 'number') return;
+          if (itemData.value === 0) return;
           hasMetals = true;
 
           const value = itemData.value;
@@ -228,7 +232,8 @@ export default function DashboardPage() {
 
           const safeLabel = String(label || itemKey);
           const formattedLabel = safeLabel.includes(',') ? `"${safeLabel}"` : safeLabel;
-          csvContent += `${formattedLabel},Precious Metals,${zakatablePercent.toFixed(2)}%,${value.toFixed(2)}\n`;
+          const zakatDue = typeof itemData.zakatDue === 'number' ? itemData.zakatDue : 0;
+          csvContent += `${formattedLabel},Precious Metals,${zakatablePercent.toFixed(2)}%,${value.toFixed(2)},${zakatDue.toFixed(2)}\n`;
         });
 
         if (hasMetals) {
@@ -247,7 +252,7 @@ export default function DashboardPage() {
       if (breakdown.combined.totalValue > 0) {
         overallPercent = (breakdown.combined.zakatableValue / breakdown.combined.totalValue) * 100;
       }
-      csvContent += `Total Summary,All Assets,${overallPercent.toFixed(2)}%,${breakdown.combined.totalValue.toFixed(2)}\n`;
+      csvContent += `Total Summary,All Assets,${overallPercent.toFixed(2)}%,${breakdown.combined.totalValue.toFixed(2)},${breakdown.combined.zakatDue.toFixed(2)}\n`;
 
       // Get formatted date for filename
       const date = new Date();

@@ -15,6 +15,7 @@ describe('Crypto Calculator Validation', () => {
   const validValues: CryptoValues = {
     coins: [
       {
+        id: '1',
         symbol: 'BTC',
         quantity: 1.5,
         currentPrice: 50000,
@@ -22,6 +23,7 @@ describe('Crypto Calculator Validation', () => {
         zakatDue: 1875
       },
       {
+        id: '2',
         symbol: 'ETH',
         quantity: 10,
         currentPrice: 3000,
@@ -77,6 +79,7 @@ describe('Crypto Calculator Validation', () => {
       const negativeValues: CryptoValues = {
         coins: [
           {
+            id: '3',
             symbol: 'BTC',
             quantity: -1.5, // Negative value
             currentPrice: 50000,

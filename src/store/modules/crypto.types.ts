@@ -1,6 +1,7 @@
 import { AssetBreakdown } from '@/lib/assets/types'
 
 export interface CryptoHolding {
+  id: string
   symbol: string
   quantity: number
   currentPrice: number
@@ -29,7 +30,7 @@ export interface CryptoSlice {
 
   // Actions
   addCoin: (symbol: string, amount: number, currency?: string, inputMode?: 'quantity' | 'value') => Promise<void>
-  removeCoin: (symbol: string) => void
+  removeCoin: (id: string) => void
   resetCryptoValues: () => void
   setCryptoHawl: (value: boolean) => void
   updatePrices: (currency?: string) => Promise<void>

@@ -49,43 +49,21 @@ export const createCryptoSlice: StateCreator<
     }
 
     try {
-      console.log(`Adding ${amount} (${inputMode}) of ${symbol} in ${currency}`);
-      const currentPrice = await getCryptoPrice(symbol, currency)
+      // Attempt to get price just for informational purposes (e.g., to derive quantity)
+      let currentPrice = 0;
+      try {
+        currentPrice = await getCryptoPrice(symbol, currency);
+      } catch (err) {
+        if (inputMode === 'value') {
+          console.warn(`Could not fetch price for ${symbol}, proceeding with user-provided monetary value`);
+        } else {
+          throw err;
+        }
+      }
 
-      if (currentPrice === 0 && (symbol.toUpperCase() === 'BTC' || symbol.toUpperCase() === 'ETH')) {
+      if (currentPrice === 0 && inputMode !== 'value' && (symbol.toUpperCase() === 'BTC' || symbol.toUpperCase() === 'ETH')) {
         console.warn(`Received zero price for ${symbol}, using fallback price`);
-        const fallbackPrice = FALLBACK_PRICES[symbol.toUpperCase()]
-        const { quantity, marketValue } = resolveAmounts(fallbackPrice)
-        const zakatDue = roundCurrency(marketValue * ZAKAT_RATE);
-
-        set((state: ZakatState) => {
-          const newCoins = [...state.cryptoValues.coins, {
-            symbol: symbol.toUpperCase(),
-            quantity,
-            currentPrice: fallbackPrice,
-            marketValue,
-            zakatDue,
-            currency,
-            isFallback: true,
-            inputMode,
-            inputValue: amount
-          }]
-
-          const total = roundCurrency(newCoins.reduce((sum: number, coin: CryptoHolding) => sum + coin.marketValue, 0))
-
-          return {
-            cryptoValues: {
-              ...state.cryptoValues,
-              coins: newCoins,
-              total_value: total,
-              zakatable_value: state.cryptoHawlMet ? total : 0
-            },
-            isLoading: false,
-            lastError: 'Using fallback price due to API issues'
-          }
-        });
-
-        return;
+        currentPrice = FALLBACK_PRICES[symbol.toUpperCase()];
       }
 
       const { quantity, marketValue } = resolveAmounts(currentPrice)
@@ -93,10 +71,12 @@ export const createCryptoSlice: StateCreator<
       const zakatDue = roundCurrency(roundedMarketValue * ZAKAT_RATE)
 
       set((state: ZakatState) => {
+        const newCoinId = Math.random().toString(36).substring(7);
         const newCoins = [...state.cryptoValues.coins, {
+          id: newCoinId,
           symbol: symbol.toUpperCase(),
           quantity,
-          currentPrice: roundCurrency(currentPrice),
+          currentPrice: currentPrice > 0 ? roundCurrency(currentPrice) : 0,
           marketValue: roundedMarketValue,
           zakatDue,
           currency,
@@ -113,65 +93,28 @@ export const createCryptoSlice: StateCreator<
             total_value: total,
             zakatable_value: state.cryptoHawlMet ? total : 0
           },
-          isLoading: false, // Set loading state to false after successful operation
+          isLoading: false,
           lastError: null
         }
       })
     } catch (error) {
       console.error('Error adding coin:', error)
 
-      // For major coins, add with fallback price if API fails
-      if (symbol.toUpperCase() === 'BTC' || symbol.toUpperCase() === 'ETH') {
-        console.log(`Using fallback price for ${symbol} due to API error`);
-        const fallbackPrice = FALLBACK_PRICES[symbol.toUpperCase()]
-        const { quantity: resolvedQty, marketValue } = resolveAmounts(fallbackPrice)
-        const zakatDue = roundCurrency(marketValue * ZAKAT_RATE);
-
-        set((state: ZakatState) => {
-          const newCoins = [...state.cryptoValues.coins, {
-            symbol: symbol.toUpperCase(),
-            quantity: resolvedQty,
-            currentPrice: fallbackPrice,
-            marketValue,
-            zakatDue,
-            currency,
-            isFallback: true,
-            inputMode,
-            inputValue: amount
-          }]
-
-          const total = roundCurrency(newCoins.reduce((sum: number, coin: CryptoHolding) => sum + coin.marketValue, 0))
-
-          return {
-            cryptoValues: {
-              ...state.cryptoValues,
-              coins: newCoins,
-              total_value: total,
-              zakatable_value: state.cryptoHawlMet ? total : 0
-            },
-            isLoading: false,
-            lastError: 'Using fallback price due to API issues'
-          }
-        });
-
-        return;
-      }
-
       set({
-        isLoading: false, // Set loading state to false in case of error
+        isLoading: false,
         lastError: error instanceof CryptoAPIError ? error.message : 'Failed to add coin'
       })
       throw error
     }
   },
 
-  removeCoin: (symbol: string) => {
+  removeCoin: (id: string) => {
     // Set loading state to true
     set({ isLoading: true })
 
     set((state: ZakatState) => {
       const newCoins = state.cryptoValues.coins.filter(
-        (coin: CryptoHolding) => coin.symbol !== symbol.toUpperCase()
+        (coin: CryptoHolding) => (coin.id ? coin.id !== id : coin.symbol.toUpperCase() !== id.toUpperCase())
       )
 
       const total = roundCurrency(newCoins.reduce((sum: number, coin: CryptoHolding) => sum + coin.marketValue, 0))
@@ -219,15 +162,32 @@ export const createCryptoSlice: StateCreator<
 
     try {
       // Update each coin individually to handle failures gracefully
-      for (const coin of coins) {
+      for (let i = 0; i < coins.length; i++) {
+        const coin = coins[i];
         try {
-          const currentPrice = await getCryptoPrice(coin.symbol, currency)
-          const marketValue = roundCurrency(coin.quantity * currentPrice)
-          const zakatDue = roundCurrency(marketValue * ZAKAT_RATE)
+          if (coin.inputMode === 'value') {
+            // Keep the exact monetary value entered by the user
+            const marketValue = roundCurrency(coin.inputValue ?? coin.marketValue)
+            const zakatDue = roundCurrency(marketValue * ZAKAT_RATE)
 
-          const index = updatedCoins.findIndex(c => c.symbol === coin.symbol)
-          if (index !== -1) {
-            updatedCoins[index] = {
+            // Optionally attempt to update price just to keep it fresh without altering marketValue
+            let newPrice = coin.currentPrice;
+            try { newPrice = await getCryptoPrice(coin.symbol, currency); } catch(ex) {}
+
+            updatedCoins[i] = {
+              ...coin,
+              currentPrice: roundCurrency(newPrice),
+              quantity: newPrice > 0 ? marketValue / newPrice : 0,
+              marketValue,
+              zakatDue,
+              currency
+            }
+          } else {
+            const currentPrice = await getCryptoPrice(coin.symbol, currency)
+            const marketValue = roundCurrency(coin.quantity * currentPrice)
+            const zakatDue = roundCurrency(marketValue * ZAKAT_RATE)
+
+            updatedCoins[i] = {
               ...coin,
               currentPrice: roundCurrency(currentPrice),
               marketValue,
@@ -334,7 +294,8 @@ export const createCryptoSlice: StateCreator<
         marketValue: roundCurrency(convertedMarketValue),
         zakatDue: roundCurrency(convertedZakatDue),
         currency: targetCurrency, // Update the currency property
-        sourceCurrency: sourceCurrency // Track the original currency
+        sourceCurrency: sourceCurrency, // Track the original currency
+        ...(coin.inputValue !== undefined && { inputValue: convertValue(coin.inputValue, sourceCurrency, targetCurrency) })
       };
     });
 
@@ -404,9 +365,9 @@ export const createCryptoSlice: StateCreator<
         tooltip: string;
         percentage: number;
         isExempt: boolean;
-      }>, coin: CryptoHolding) => ({
+      }>, coin: CryptoHolding, index: number) => ({
         ...acc,
-        [coin.symbol.toLowerCase()]: {
+        [`${coin.symbol.toLowerCase()}-${coin.id || index}`]: {
           value: roundCurrency(coin.marketValue),
           isZakatable: state.cryptoHawlMet,
           zakatable: state.cryptoHawlMet ? roundCurrency(coin.marketValue) : 0,
