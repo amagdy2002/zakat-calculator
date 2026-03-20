@@ -1,20 +1,21 @@
 'use client'
 
-import { RealEstateCalculator } from '@/components/calculators/realestate/RealEstateCalculator'
-import { useZakatStore } from '@/store/zakatStore'
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 
 export default function RealEstatePage() {
-  const { setRealEstateValue, setRealEstateHawlMet } = useZakatStore()
+  const router = useRouter()
+
+  useEffect(() => {
+    router.replace('/dashboard')
+  }, [router])
 
   return (
-    <div className="container mx-auto py-6">
-      <h1 className="text-3xl font-medium mb-6">Real Estate Zakat</h1>
-      <RealEstateCalculator
-        currency="USD"
-        onUpdateValues={() => {}}
-        onHawlUpdate={() => {}}
-        onCalculatorChange={() => {}}
-      />
+    <div className="flex h-screen w-full items-center justify-center">
+      <div className="text-center">
+        <h2 className="text-lg font-medium">Redirecting...</h2>
+        <p className="text-sm text-gray-500">Taking you to the dashboard</p>
+      </div>
     </div>
   )
-} 
+}
