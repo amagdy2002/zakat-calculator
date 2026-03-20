@@ -198,30 +198,25 @@ export default function HomePage() {
 
             {/* CTA Button */}
             <div className="pt-2">
-              <a
-                href="#"
-                className="block"
+              <Button
+                variant="default"
+                size="lg"
+                className="rounded-lg bg-black hover:bg-gray-800 text-white px-8 h-12 text-sm w-full"
+                disabled={isLoading}
                 onClick={handleStartCalculation}
               >
-                <Button
-                  variant="default"
-                  size="lg"
-                  className="rounded-lg bg-black hover:bg-gray-800 text-white px-8 h-12 text-sm w-full"
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <div className="flex items-center">
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {tc('loading')}
-                    </div>
-                  ) : (
-                    <div className="flex items-center">
-                      {tc('startCalculation')}
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </div>
-                  )}
-                </Button>
-              </a>
+                {isLoading ? (
+                  <div className="flex items-center">
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {tc('loading')}
+                  </div>
+                ) : (
+                  <div className="flex items-center">
+                    {tc('startCalculation')}
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </div>
+                )}
+              </Button>
             </div>
           </motion.div>
 
