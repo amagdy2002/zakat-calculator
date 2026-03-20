@@ -2,6 +2,7 @@
 
 import React from 'react'
 import dynamic from 'next/dynamic'
+import { useRouter } from 'next/navigation'
 
 const CurrencyErrorDebugger = dynamic(
   () => import('@/components/ui/debug/CurrencyErrorDebugger').then(mod => ({ default: mod.CurrencyErrorDebugger })),
@@ -14,14 +15,16 @@ const NisabDebugger = dynamic(
 )
 
 export default function DevPage() {
-  // Only render in development
+  const router = useRouter()
+
+  // Redirect to home in production
   if (process.env.NODE_ENV !== 'development') {
+    router.replace('/')
     return (
-      <div className="container mx-auto py-8">
-        <h1 className="text-xl font-bold">Development Tools</h1>
-        <p className="mt-4 text-gray-600">
-          This page is only available in development mode.
-        </p>
+      <div className="flex h-screen w-full items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-lg font-medium">Redirecting...</h2>
+        </div>
       </div>
     )
   }
